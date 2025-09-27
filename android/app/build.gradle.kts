@@ -16,7 +16,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        multiDexEnabled = true
     }
 
     compileOptions {
@@ -47,11 +48,11 @@ dependencies {
     implementation(kotlin("stdlib-jdk8")) // Use kotlin-stdlib-jdk8 for Java 8 features
     implementation(platform("com.google.firebase:firebase-bom:32.7.0")) // Ensure Firebase BOM is used and up-to-date
     implementation("com.google.firebase:firebase-messaging") // Existing FCM dependency
-    implementation("com.google.firebase:firebase-auth") // Assuming you have this for auth
+    implementation("com.google.firebase:firebase-auth:22.3.1") // Assuming you have this for auth
     implementation("com.google.firebase:firebase-firestore") // Assuming you have this for firestore
 
     // Add the desugaring library
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:1.2.2")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
