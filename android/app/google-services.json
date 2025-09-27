@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "341283748050",
+    "project_id": "genie-on-call-769a1",
+    "storage_bucket": "genie-on-call-769a1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:341283748050:android:d9c6e4f71e11411047d50b",
+        "android_client_info": {
+          "package_name": "com.example.genie_on_call"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyArT2kayftUu0VIRNuUmslkep11cNPn3K8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,259 @@
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
+import 'home_screen.dart';
+
+class OTPScreen extends StatefulWidget {
+  final String verificationId;
+  const OTPScreen({super.key, required this.verificationId});
+
+  @override
+  State<OTPScreen> createState() => _OTPScreenState();
+}
+
+class _OTPScreenState extends State<OTPScreen> {
+  final TextEditingController otpController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  bool _isLoading = false; // To manage loading state for the button
+
+  Future<void> _saveUserData(User user) async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied ||
+            permission == LocationPermission.deniedForever) {
+          // Handle cases where permission is denied
+          print("Location permissions are denied or denied forever.");
+          // You might want to show an alert here as well
+          // For now, proceed without location if permission is denied
+          await _firestore.collection("users").doc(user.uid).set({
+            "phone": user.phoneNumber,
+            "createdAt": FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+          return;
+        }
+      }
+
+      Position pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      await _firestore.collection("users").doc(user.uid).set({
+        "phone": user.phoneNumber,
+        "latitude": pos.latitude,
+        "longitude": pos.longitude,
+        "createdAt": FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print("Error saving user data or getting location: $e");
+      // Even if location fails, try to save phone number
+      await _firestore.collection("users").doc(user.uid).set({
+        "phone": user.phoneNumber,
+        "createdAt": FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+  }
+
+  void _verifyOTP() async {
+    if (otpController.text.trim().isEmpty ||
+        otpController.text.trim().length != 6) {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text(
+            'Invalid OTP',
+            style: TextStyle(
+              fontFamily: 'Montserrat',
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: const Text(
+            'Please enter the 6-digit OTP.',
+            style: TextStyle(fontFamily: 'Montserrat'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text(
+                'OK',
+                style: TextStyle(
+                  fontFamily: 'Montserrat',
+                  color: Colors.blueAccent,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    PhoneAuthCredential credential = PhoneAuthProvider.credential(
+      verificationId: widget.verificationId,
+      smsCode: otpController.text.trim(),
+    );
+
+    try {
+      UserCredential userCred = await _auth.signInWithCredential(credential);
+      if (userCred.user != null) {
+        await _saveUserData(userCred.user!);
+      }
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        showDialog(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text(
+              'Verification Failed',
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: Text(
+              'Invalid OTP or an error occurred: ${e.toString()}',
+              style: const TextStyle(fontFamily: 'Montserrat'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text(
+                  'OK',
+                  style: TextStyle(
+                    fontFamily: 'Montserrat',
+                    color: Colors.blueAccent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: const Text(
+          'Verify OTP',
+          style: TextStyle(
+            fontFamily: 'Montserrat',
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 1,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 50),
+            const SizedBox(height: 40),
+            const Text(
+              "Enter the 6-digit code sent to your phone number",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: otpController,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                labelText: "OTP",
+                hintText: "------",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Colors.blueAccent.withOpacity(0.5),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: Colors.blueAccent,
+                    width: 2,
+                  ),
+                ),
+                labelStyle: const TextStyle(
+                  fontFamily: 'Montserrat',
+                  color: Colors.grey,
+                ),
+                hintStyle: const TextStyle(
+                  fontFamily: 'Montserrat',
+                  color: Colors.grey,
+                ),
+                counterText: "", // Hide the default maxLength counter
+              ),
+              style: const TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 20,
+                letterSpacing: 10,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _verifyOTP,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 5,
+                ),
+                child: _isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
+                        "Verify OTP",
+                        style: TextStyle(
+                          fontFamily: 'Montserrat',
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
