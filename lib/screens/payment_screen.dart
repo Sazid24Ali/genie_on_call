@@ -41,16 +41,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
     try {
       // 1. Update user profile (if any last-minute changes were made, though this is primarily done in BookingSlotScreen)
-      await _firestore.collection('users').doc(_currentUser!.uid).set({
+      await _firestore.collection('users').doc(_currentUser.uid).set({
         'name': widget.userName,
         'address': widget.userAddress,
-        'phoneNumber': _currentUser!.phoneNumber,
+        'phoneNumber': _currentUser.phoneNumber,
         'lastUpdated': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
       // 2. Create booking
       await _firestore.collection('bookings').add({
-        'userId': _currentUser!.uid,
+        'userId': _currentUser.uid,
         'userName': widget.userName,
         'userAddress': widget.userAddress,
         'serviceName': widget.serviceName,

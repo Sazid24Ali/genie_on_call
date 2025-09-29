@@ -54,7 +54,7 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
     try {
       final userDoc = await _firestore
           .collection('users')
-          .doc(_currentUser!.uid)
+          .doc(_currentUser.uid)
           .get();
       if (userDoc.exists) {
         setState(() {
@@ -91,7 +91,7 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
                 _userAddress = address;
                 _addressController.text = address;
               });
-              await _firestore.collection('users').doc(_currentUser!.uid).set({
+              await _firestore.collection('users').doc(_currentUser.uid).set({
                 'address': address,
                 'lastUpdated': FieldValue.serverTimestamp(),
               }, SetOptions(merge: true));
@@ -310,10 +310,10 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
     }
 
     try {
-      await _firestore.collection('users').doc(_currentUser!.uid).set({
+      await _firestore.collection('users').doc(_currentUser.uid).set({
         'name': _nameController.text,
         'address': _addressController.text,
-        'phoneNumber': _currentUser!.phoneNumber,
+        'phoneNumber': _currentUser.phoneNumber,
         'lastUpdated': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (e) {

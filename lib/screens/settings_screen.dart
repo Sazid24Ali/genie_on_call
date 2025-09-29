@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:genie_on_call/screens/login_screen.dart';
 import 'package:intl/intl.dart'; // For date formatting
 
 class SettingsScreen extends StatefulWidget {
@@ -267,14 +266,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 }
 
-                final bookings = snapshot.data!.docs;
+                List<QueryDocumentSnapshot<Map<String, dynamic>>> sortedBookings = List.from(snapshot.data!.docs);
+
+                if (_selectedFilter == 'All') {
+                  // Sort for 'All': Finished first (Finished), then Pending, then others, within each by createdAt descending
+                  sortedBookings.sort((a, b) {
+                    final aData = a.data();
+                    final bData = b.data();
+                    final aStatus = aData['status'] ?? '';
+                    final bStatus = bData['status'] ?? '';
+
+                    // Priority: Finished (0), Pending (1), others (2)
+                    int aPriority = 2;
+                    if (aStatus == 'Finished') aPriority = 0;
+                    else if (aStatus == 'Pending') aPriority = 1;
+
+                    int bPriority = 2;
+                    if (bStatus == 'Finished') bPriority = 0;
+                    else if (bStatus == 'Pending') bPriority = 1;
+
+                    if (aPriority != bPriority) {
+                      return aPriority.compareTo(bPriority); // Lower priority first
+                    }
+
+                    // Same priority, sort by createdAt descending
+                    final aCreatedAt = aData['createdAt'] as Timestamp? ?? Timestamp.now();
+                    final bCreatedAt = bData['createdAt'] as Timestamp? ?? Timestamp.now();
+                    return bCreatedAt.compareTo(aCreatedAt);
+                  });
+                } // For 'Pending', already filtered and ordered by createdAt desc in stream
 
                 return ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: bookings.length,
+                  itemCount: sortedBookings.length,
                   itemBuilder: (context, index) {
-                    final booking = bookings[index].data();
+                    final booking = sortedBookings[index].data();
                     final Timestamp bookingTimestamp =
                         booking['bookingDate'] as Timestamp;
                     final DateTime bookingDateTime = bookingTimestamp.toDate();
@@ -400,7 +427,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                                   try {
                                                     await _firestore
                                                         .collection('bookings')
-                                                        .doc(bookings[index].id)
+                                                        .doc(sortedBookings[index].id)
                                                         .update({
                                                           'status': 'Cancelled',
                                                         });
@@ -561,7 +588,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                                   try {
                                                     await _firestore
                                                         .collection('bookings')
-                                                        .doc(bookings[index].id)
+                                                        .doc(sortedBookings[index].id)
                                                         .delete(); // Permanently delete
                                                     if (mounted) {
                                                       showDialog(
