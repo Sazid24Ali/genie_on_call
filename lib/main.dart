@@ -1,4 +1,4 @@
-// import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -6,11 +6,13 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:genie_on_call/screens/home_screen.dart';
 import 'package:genie_on_call/screens/login_screen.dart';
+import 'package:genie_on_call/screens/role_selection_screen.dart';
+import 'package:genie_on_call/screens/agent_home_screen.dart';
+
 
 // final FirebaseAuth _auth = FirebaseAuth.instance;
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
-
 
 void initializeLocalNotification() {
   const AndroidInitializationSettings initializationSettingsAndroid =
@@ -107,7 +109,43 @@ class MyApp extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasData) {
-            return const HomeScreen();
+            return FutureBuilder<DocumentSnapshot>(
+              future: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(snapshot.data!.uid)
+                  .get(),
+              builder: (context, userSnapshot) {
+                if (userSnapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (userSnapshot.hasData && userSnapshot.data!.exists) {
+                  final data =
+                      userSnapshot.data!.data() as Map<String, dynamic>;
+                  final role = data['role'];
+                  return FutureBuilder<DocumentSnapshot>(
+                    future: FirebaseFirestore.instance
+                        .collection('agents')
+                        .doc(snapshot.data!.uid)
+                        .get(),
+                    builder: (context, agentSnapshot) {
+                      if (agentSnapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (agentSnapshot.hasData && agentSnapshot.data!.exists) {
+                        return const AgentHomeScreen();
+                      } else if (role == 'user') {
+                        return const HomeScreen();
+                      } else {
+                        return const RoleSelectionScreen();
+                      }
+                    },
+                  );
+                } else {
+                  return const RoleSelectionScreen();
+                }
+              },
+            );
           }
           return const LoginScreen();
         },

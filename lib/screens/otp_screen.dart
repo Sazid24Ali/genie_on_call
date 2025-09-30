@@ -2,11 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'role_selection_screen.dart';
 import 'home_screen.dart';
+import 'agent_profile_screen.dart';
+import 'agent_home_screen.dart';
 
 class OTPScreen extends StatefulWidget {
   final String verificationId;
-  const OTPScreen({super.key, required this.verificationId});
+  final String selectedRole;
+  const OTPScreen({
+    super.key,
+    required this.verificationId,
+    required this.selectedRole,
+  });
 
   @override
   State<OTPScreen> createState() => _OTPScreenState();
@@ -31,6 +39,7 @@ class _OTPScreenState extends State<OTPScreen> {
           // For now, proceed without location if permission is denied
           await _firestore.collection("users").doc(user.uid).set({
             "phone": user.phoneNumber,
+            "role": widget.selectedRole,
             "createdAt": FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
           return;
@@ -43,15 +52,17 @@ class _OTPScreenState extends State<OTPScreen> {
 
       await _firestore.collection("users").doc(user.uid).set({
         "phone": user.phoneNumber,
+        "role": widget.selectedRole,
         "latitude": pos.latitude,
         "longitude": pos.longitude,
         "createdAt": FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (e) {
       print("Error saving user data or getting location: $e");
-      // Even if location fails, try to save phone number
+      // Even if location fails, try to save phone number and role
       await _firestore.collection("users").doc(user.uid).set({
         "phone": user.phoneNumber,
+        "role": widget.selectedRole,
         "createdAt": FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     }
@@ -104,17 +115,41 @@ class _OTPScreenState extends State<OTPScreen> {
       UserCredential userCred = await _auth.signInWithCredential(credential);
       if (userCred.user != null) {
         await _saveUserData(userCred.user!);
-      }
 
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-          (route) => false,
-        );
+        if (mounted) {
+          if (widget.selectedRole == 'user') {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+              (route) => false,
+            );
+          } else if (widget.selectedRole == 'agent') {
+            // Check if agent profile exists
+            final agentDoc = await _firestore
+                .collection('agents')
+                .doc(userCred.user!.uid)
+                .get();
+            if (agentDoc.exists) {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const AgentHomeScreen()),
+                (route) => false,
+              );
+            } else {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const AgentProfileScreen()),
+                (route) => false,
+              );
+            }
+          } else {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+              (route) => false,
+            );
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -149,6 +184,12 @@ class _OTPScreenState extends State<OTPScreen> {
             ],
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }

@@ -266,7 +266,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 }
 
-                List<QueryDocumentSnapshot<Map<String, dynamic>>> sortedBookings = List.from(snapshot.data!.docs);
+                List<QueryDocumentSnapshot<Map<String, dynamic>>>
+                sortedBookings = List.from(snapshot.data!.docs);
 
                 if (_selectedFilter == 'All') {
                   // Sort for 'All': Finished first (Finished), then Pending, then others, within each by createdAt descending
@@ -278,20 +279,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                     // Priority: Finished (0), Pending (1), others (2)
                     int aPriority = 2;
-                    if (aStatus == 'Finished') aPriority = 0;
-                    else if (aStatus == 'Pending') aPriority = 1;
+                    if (aStatus == 'Finished')
+                      aPriority = 0;
+                    else if (aStatus == 'Pending')
+                      aPriority = 1;
 
                     int bPriority = 2;
-                    if (bStatus == 'Finished') bPriority = 0;
-                    else if (bStatus == 'Pending') bPriority = 1;
+                    if (bStatus == 'Finished')
+                      bPriority = 0;
+                    else if (bStatus == 'Pending')
+                      bPriority = 1;
 
                     if (aPriority != bPriority) {
-                      return aPriority.compareTo(bPriority); // Lower priority first
+                      return aPriority.compareTo(
+                        bPriority,
+                      ); // Lower priority first
                     }
 
                     // Same priority, sort by createdAt descending
-                    final aCreatedAt = aData['createdAt'] as Timestamp? ?? Timestamp.now();
-                    final bCreatedAt = bData['createdAt'] as Timestamp? ?? Timestamp.now();
+                    final aCreatedAt =
+                        aData['createdAt'] as Timestamp? ?? Timestamp.now();
+                    final bCreatedAt =
+                        bData['createdAt'] as Timestamp? ?? Timestamp.now();
                     return bCreatedAt.compareTo(aCreatedAt);
                   });
                 } // For 'Pending', already filtered and ordered by createdAt desc in stream
@@ -309,6 +318,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       'MMM d, yyyy',
                     ).format(bookingDateTime);
 
+                    final String agentId = booking['agentId'] ?? '';
                     final String serviceProviderName =
                         booking['serviceProviderName'] ?? 'Not Assigned';
                     final String serviceProviderPhone =
@@ -371,16 +381,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            _buildDetailRow(
-                              Icons.person_rounded,
-                              'Name',
-                              serviceProviderName,
-                            ),
-                            _buildDetailRow(
-                              Icons.phone_android_rounded,
-                              'Phone',
-                              serviceProviderPhone,
-                            ),
+                            if (agentId.isNotEmpty)
+                              FutureBuilder<DocumentSnapshot>(
+                                future: _firestore.collection('agents').doc(agentId).get(),
+                                builder: (context, agentSnapshot) {
+                                  if (agentSnapshot.connectionState == ConnectionState.waiting) {
+                                    return const Center(child: CircularProgressIndicator());
+                                  }
+                                  if (agentSnapshot.hasData && agentSnapshot.data!.exists) {
+                                    final agentData = agentSnapshot.data!.data() as Map<String, dynamic>;
+                                    final agentName = agentData['name'] ?? 'Unknown Agent';
+                                    final agentPhone = agentData['phone'] ?? 'N/A';
+                                    return Column(
+                                      children: [
+                                        _buildDetailRow(
+                                          Icons.person_rounded,
+                                          'Name',
+                                          agentName,
+                                        ),
+                                        _buildDetailRow(
+                                          Icons.phone_android_rounded,
+                                          'Phone',
+                                          agentPhone,
+                                        ),
+                                      ],
+                                    );
+                                  } else {
+                                    return Column(
+                                      children: [
+                                        _buildDetailRow(
+                                          Icons.person_rounded,
+                                          'Name',
+                                          'Agent not found',
+                                        ),
+                                        _buildDetailRow(
+                                          Icons.phone_android_rounded,
+                                          'Phone',
+                                          'N/A',
+                                        ),
+                                      ],
+                                    );
+                                  }
+                                },
+                              )
+                            else
+                              Column(
+                                children: [
+                                  _buildDetailRow(
+                                    Icons.person_rounded,
+                                    'Name',
+                                    serviceProviderName,
+                                  ),
+                                  _buildDetailRow(
+                                    Icons.phone_android_rounded,
+                                    'Phone',
+                                    serviceProviderPhone,
+                                  ),
+                                ],
+                              ),
                             // Action buttons based on status
                             Align(
                               alignment: Alignment.bottomRight,
@@ -427,7 +485,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                                   try {
                                                     await _firestore
                                                         .collection('bookings')
-                                                        .doc(sortedBookings[index].id)
+                                                        .doc(
+                                                          sortedBookings[index]
+                                                              .id,
+                                                        )
                                                         .update({
                                                           'status': 'Cancelled',
                                                         });
@@ -588,7 +649,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                                   try {
                                                     await _firestore
                                                         .collection('bookings')
-                                                        .doc(sortedBookings[index].id)
+                                                        .doc(
+                                                          sortedBookings[index]
+                                                              .id,
+                                                        )
                                                         .delete(); // Permanently delete
                                                     if (mounted) {
                                                       showDialog(

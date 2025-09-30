@@ -40,7 +40,20 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
 
     try {
-      // 1. Update user profile (if any last-minute changes were made, though this is primarily done in BookingSlotScreen)
+      // 1. Fetch user location
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(_currentUser.uid)
+          .get();
+      double? userLat;
+      double? userLng;
+      if (userDoc.exists) {
+        final data = userDoc.data();
+        userLat = data?['latitude'];
+        userLng = data?['longitude'];
+      }
+
+      // 2. Update user profile (if any last-minute changes were made, though this is primarily done in BookingSlotScreen)
       await _firestore.collection('users').doc(_currentUser.uid).set({
         'name': widget.userName,
         'address': widget.userAddress,
@@ -48,17 +61,21 @@ class _PaymentScreenState extends State<PaymentScreen> {
         'lastUpdated': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      // 2. Create booking
+      // 3. Create booking
       await _firestore.collection('bookings').add({
         'userId': _currentUser.uid,
         'userName': widget.userName,
         'userAddress': widget.userAddress,
+        'userLat': userLat,
+        'userLng': userLng,
+        'userPhone': _currentUser.phoneNumber,
         'serviceName': widget.serviceName,
         'cost': widget.cost,
         'bookingDate': Timestamp.fromDate(widget.selectedDate),
         'bookingTime': widget.selectedTimeSlot,
         'paymentMethod': paymentMethod, // Store the chosen payment method
         'status': 'Pending', // Initial status
+        'agentId': null,
         'createdAt': FieldValue.serverTimestamp(),
       });
 
