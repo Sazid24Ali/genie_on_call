@@ -3,9 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'otp_screen.dart';
-import 'home_screen.dart';
-import 'agent_profile_screen.dart';
-import 'agent_home_screen.dart';
+import 'user/home_screen.dart';
+import 'agent/agent_profile_screen.dart';
+import 'agent/agent_home_screen.dart';
 import 'role_selection_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -24,35 +24,78 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _saveUserData(User user) async {
     try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied ||
-            permission == LocationPermission.deniedForever) {
-          // Handle cases where permission is denied
-          print("Location permissions are denied or denied forever.");
-          // You might want to show an alert here as well
-          // For now, proceed without location if permission is denied
+      final userDoc = await _firestore.collection("users").doc(user.uid).get();
+      final bool isAgent = selectedRole == 'agent';
+
+      // For agent, always require location permission and update location
+      if (isAgent) {
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+          if (permission == LocationPermission.denied ||
+              permission == LocationPermission.deniedForever) {
+            // Handle cases where permission is denied
+            print("Location permissions are denied or denied forever.");
+            // You might want to show an alert here as well
+            // For now, proceed without location if permission is denied
+            await _firestore.collection("users").doc(user.uid).set({
+              "phone": user.phoneNumber,
+              "role": selectedRole,
+              "createdAt": FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+            return;
+          }
+        }
+
+        Position pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+
+        await _firestore.collection("users").doc(user.uid).set({
+          "phone": user.phoneNumber,
+          "role": selectedRole,
+          "latitude": pos.latitude,
+          "longitude": pos.longitude,
+          "createdAt": FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } else {
+        // For user, only ask location permission and save location if first time (no lat/lng saved)
+        if (!userDoc.exists || userDoc.data()?['latitude'] == null || userDoc.data()?['longitude'] == null) {
+          LocationPermission permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.denied) {
+            permission = await Geolocator.requestPermission();
+            if (permission == LocationPermission.denied ||
+                permission == LocationPermission.deniedForever) {
+              print("Location permissions are denied or denied forever.");
+              await _firestore.collection("users").doc(user.uid).set({
+                "phone": user.phoneNumber,
+                "role": selectedRole,
+                "createdAt": FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+              return;
+            }
+          }
+
+          Position pos = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high,
+          );
+
+          await _firestore.collection("users").doc(user.uid).set({
+            "phone": user.phoneNumber,
+            "role": selectedRole,
+            "latitude": pos.latitude,
+            "longitude": pos.longitude,
+            "createdAt": FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        } else {
+          // Location already saved, just update phone and role
           await _firestore.collection("users").doc(user.uid).set({
             "phone": user.phoneNumber,
             "role": selectedRole,
             "createdAt": FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
-          return;
         }
       }
-
-      Position pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-
-      await _firestore.collection("users").doc(user.uid).set({
-        "phone": user.phoneNumber,
-        "role": selectedRole,
-        "latitude": pos.latitude,
-        "longitude": pos.longitude,
-        "createdAt": FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
     } catch (e) {
       print("Error saving user data or getting location: $e");
       // Even if location fails, try to save phone number and role
@@ -298,14 +341,14 @@ class _LoginScreenState extends State<LoginScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 50),
-        const Text(
+        Text(
           "Choose how you want to use Genie On Call",
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'Montserrat',
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: Colors.black87,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
           ),
         ),
         const SizedBox(height: 40),
@@ -365,14 +408,14 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         const SizedBox(height: 50),
         const SizedBox(height: 40),
-        const Text(
+        Text(
           "Enter your phone number to continue",
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'Montserrat',
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: Colors.black87,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
           ),
         ),
         const SizedBox(height: 24),
@@ -454,32 +497,65 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Text(
-          'Login',
-          style: TextStyle(
-            fontFamily: 'Montserrat',
-            color: Colors.black87,
-            fontWeight: FontWeight.bold,
+    return Theme(
+      data: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+          elevation: 0,
+        ),
+        cardTheme: CardThemeData(
+          color: Colors.white,
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
-        backgroundColor: Colors.white,
-        elevation: 1,
-        leading: selectedRole != null
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.black87),
-                onPressed: () => setState(() => selectedRole = null),
-              )
-            : null,
+        textTheme: TextTheme(
+          bodyLarge: TextStyle(
+            color: Color(0xDE000000),
+            fontFamily: 'Montserrat',
+          ),
+          bodyMedium: TextStyle(
+            color: Color(0x99000000),
+            fontFamily: 'Montserrat',
+          ),
+        ),
+        fontFamily: 'Montserrat',
       ),
-      body: SingleChildScrollView(
-        // Added SingleChildScrollView
-        padding: const EdgeInsets.all(24),
-        child: selectedRole == null
-            ? _buildRoleSelection()
-            : _buildPhoneInput(),
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: AppBar(
+          title: Text(
+            'Login',
+            style: TextStyle(
+              fontFamily: 'Montserrat',
+              color: Theme.of(context).textTheme.bodyLarge?.color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+          elevation: 1,
+          leading: selectedRole != null
+              ? IconButton(
+                  icon: Icon(
+                    Icons.arrow_back,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
+                  onPressed: () => setState(() => selectedRole = null),
+                )
+              : null,
+        ),
+        body: SingleChildScrollView(
+          // Added SingleChildScrollView
+          padding: const EdgeInsets.all(24),
+          child: selectedRole == null
+              ? _buildRoleSelection()
+              : _buildPhoneInput(),
+        ),
       ),
     );
   }

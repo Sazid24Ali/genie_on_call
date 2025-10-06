@@ -2,27 +2,32 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; // For date formatting
+import 'package:provider/provider.dart';
+import 'package:genie_on_call/providers/theme_provider.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:permission_handler/permission_handler.dart';
 
-class SettingsScreen extends StatefulWidget {
-  final String phoneNumber; // User's phone number
-  const SettingsScreen({super.key, required this.phoneNumber});
+class UserBookingsScreen extends StatefulWidget {
+  const UserBookingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  State<UserBookingsScreen> createState() => _UserBookingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _UserBookingsScreenState extends State<UserBookingsScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String _selectedFilter = 'Pending'; // 'Pending' or 'All'
   String? _userName; // Added to store the user's name
+  String? _userPhone; // Added to store the user's phone
 
   User? get _currentUser => _auth.currentUser;
 
   @override
   void initState() {
     super.initState();
-    _fetchUserData(); // Fetch user data including name
+    _fetchUserData(); // Fetch user data including name and phone
   }
 
   Future<void> _fetchUserData() async {
@@ -36,10 +41,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (userDoc.exists) {
           setState(() {
             _userName = userDoc['name']; // Get the name from Firestore
+            _userPhone = userDoc['phone']; // Get the phone from Firestore
           });
         }
       } catch (e) {
-        print("Error fetching user name in SettingsScreen: $e");
+        print("Error fetching user data in UserBookingsScreen: $e");
       }
     }
   }
@@ -68,18 +74,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(
           'My Bookings', // Changed title to reflect its new focus
           style: TextStyle(
             fontFamily: 'Montserrat',
-            color: Colors.black87,
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.black87),
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        iconTheme: IconThemeData(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.white
+              : Colors.black87,
+        ),
         elevation: 1,
       ),
       body: SingleChildScrollView(
@@ -98,9 +107,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Your Account',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontFamily: 'Montserrat',
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -118,12 +127,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             size: 20,
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            'Name: $_userName',
-                            style: const TextStyle(
-                              fontFamily: 'Montserrat',
-                              fontSize: 16,
-                              color: Colors.black54,
+                          Text.rich(
+                            TextSpan(
+                              children: [
+                                const TextSpan(
+                                  text: 'Name: ',
+                                  style: TextStyle(
+                                    fontFamily: 'Montserrat',
+                                    fontSize: 16,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: _userName,
+                                  style: TextStyle(
+                                    fontFamily: 'Montserrat',
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white
+                                        : Colors.black54,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -137,12 +165,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           size: 20,
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          'Mobile Number: ${widget.phoneNumber}',
-                          style: const TextStyle(
-                            fontFamily: 'Montserrat',
-                            fontSize: 16,
-                            color: Colors.black54,
+                        Text.rich(
+                          TextSpan(
+                            children: [
+                              const TextSpan(
+                                text: 'Mobile Number: ',
+                                style: TextStyle(
+                                  fontFamily: 'Montserrat',
+                                  fontSize: 16,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              TextSpan(
+                                text: _userPhone ?? 'N/A',
+                                style: TextStyle(
+                                  fontFamily: 'Montserrat',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? Colors.white
+                                      : Colors.black54,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -256,10 +303,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _selectedFilter == 'Pending'
                             ? 'No pending bookings found.'
                             : 'No bookings yet.',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'Montserrat',
                           fontSize: 16,
-                          color: Colors.grey,
+                          color:
+                              Theme.of(context).textTheme.bodyLarge?.color ??
+                              Colors.black87,
                         ),
                       ),
                     ),
@@ -279,15 +328,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                     // Priority: Finished (0), Pending (1), others (2)
                     int aPriority = 2;
-                    if (aStatus == 'Finished')
+                    if (aStatus == 'Finished') {
                       aPriority = 0;
-                    else if (aStatus == 'Pending')
+                    } else if (aStatus == 'Pending')
                       aPriority = 1;
 
                     int bPriority = 2;
-                    if (bStatus == 'Finished')
+                    if (bStatus == 'Finished') {
                       bPriority = 0;
-                    else if (bStatus == 'Pending')
+                    } else if (bStatus == 'Pending')
                       bPriority = 1;
 
                     if (aPriority != bPriority) {
@@ -383,15 +432,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             const SizedBox(height: 4),
                             if (agentId.isNotEmpty)
                               FutureBuilder<DocumentSnapshot>(
-                                future: _firestore.collection('agents').doc(agentId).get(),
+                                future: _firestore
+                                    .collection('agents')
+                                    .doc(agentId)
+                                    .get(),
                                 builder: (context, agentSnapshot) {
-                                  if (agentSnapshot.connectionState == ConnectionState.waiting) {
-                                    return const Center(child: CircularProgressIndicator());
+                                  if (agentSnapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return const Center(
+                                      child: CircularProgressIndicator(),
+                                    );
                                   }
-                                  if (agentSnapshot.hasData && agentSnapshot.data!.exists) {
-                                    final agentData = agentSnapshot.data!.data() as Map<String, dynamic>;
-                                    final agentName = agentData['name'] ?? 'Unknown Agent';
-                                    final agentPhone = agentData['phone'] ?? 'N/A';
+                                  if (agentSnapshot.hasData &&
+                                      agentSnapshot.data!.exists) {
+                                    final agentData =
+                                        agentSnapshot.data!.data()
+                                            as Map<String, dynamic>;
+                                    final agentName =
+                                        agentData['name'] ?? 'Unknown Agent';
+                                    final agentPhone =
+                                        agentData['phone'] ?? 'N/A';
                                     return Column(
                                       children: [
                                         _buildDetailRow(
@@ -790,12 +850,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildDetailRow(IconData icon, String label, String value) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.grey[600], size: 18),
+          Icon(
+            icon,
+            color: isDark
+                ? Colors.black87
+                : Colors.grey[600], // Dark icons in dark mode
+            size: 18,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text.rich(
@@ -812,10 +879,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   TextSpan(
                     text: value,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'Montserrat',
                       fontSize: 14,
-                      color: Colors.black54,
+                      fontWeight:
+                          FontWeight.bold, // More bold white data in dark mode
+                      color: isDark ? Colors.white : Colors.black54,
                     ),
                   ),
                 ],

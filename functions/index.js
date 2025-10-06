@@ -25,7 +25,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 // Trigger on booking creation
-export const sendBookingScheduledNotification = onDocumentCreated(
+export const sendBookingScheduledNotifications = onDocumentCreated(
   "bookings/{bookingId}",
   async (event) => {
     const snap = event.data;
@@ -124,7 +124,7 @@ export const sendBookingScheduledNotification = onDocumentCreated(
 );
 
 // Trigger on booking update
-export const sendBookingUpdatedNotification = onDocumentUpdated(
+export const sendBookingUpdatedNotifications = onDocumentUpdated(
   "bookings/{bookingId}",
   async (event) => {
     const snap = event.data;

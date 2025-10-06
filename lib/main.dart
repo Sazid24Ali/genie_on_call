@@ -4,11 +4,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:genie_on_call/screens/home_screen.dart';
+import 'package:genie_on_call/screens/user/home_screen.dart';
 import 'package:genie_on_call/screens/login_screen.dart';
 import 'package:genie_on_call/screens/role_selection_screen.dart';
-import 'package:genie_on_call/screens/agent_home_screen.dart';
-
+import 'package:genie_on_call/screens/agent/agent_home_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:genie_on_call/providers/theme_provider.dart';
 
 // final FirebaseAuth _auth = FirebaseAuth.instance;
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -83,71 +84,120 @@ void main() async {
   runApp(const MyApp());
 }
 
+final ThemeData _lightTheme = ThemeData(
+  useMaterial3: true,
+  brightness: Brightness.light,
+  primaryColor: Colors.green,
+  scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+  appBarTheme: const AppBarTheme(
+    backgroundColor: Colors.white,
+    foregroundColor: Colors.black,
+    elevation: 0,
+  ),
+  cardTheme: CardThemeData(
+    color: Colors.white,
+    elevation: 2,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  ),
+  textTheme: TextTheme(
+    bodyLarge: TextStyle(color: Color(0xDE000000), fontFamily: 'Montserrat'),
+    bodyMedium: TextStyle(color: Color(0x99000000), fontFamily: 'Montserrat'),
+  ),
+  fontFamily: 'Montserrat',
+);
+
+final ThemeData _darkTheme = ThemeData(
+  useMaterial3: true,
+  brightness: Brightness.dark,
+  primaryColor: Colors.green,
+  scaffoldBackgroundColor: const Color(0xFF303030),
+  appBarTheme: const AppBarTheme(
+    backgroundColor: Color(0xFF212121),
+    foregroundColor: Colors.white,
+    elevation: 0,
+  ),
+  cardTheme: CardThemeData(
+    color: const Color(0xFF424242),
+    elevation: 2,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  ),
+  textTheme: TextTheme(
+    bodyLarge: TextStyle(color: Colors.white, fontFamily: 'Montserrat'),
+    bodyMedium: TextStyle(color: Colors.white70, fontFamily: 'Montserrat'),
+  ),
+  fontFamily: 'Montserrat',
+);
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Genie On Call',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
-      // builder: (context, child) {
-      //   // Listen for foreground messages and show a system notification
-      //   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      //     _showFlutterNotification(message);
-      //   });
-      //   return child!;
-      // },
-      home: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasData) {
-            return FutureBuilder<DocumentSnapshot>(
-              future: FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(snapshot.data!.uid)
-                  .get(),
-              builder: (context, userSnapshot) {
-                if (userSnapshot.connectionState == ConnectionState.waiting) {
+    return ChangeNotifierProvider(
+      create: (_) => ThemeProvider(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            title: 'Genie On Call',
+            debugShowCheckedModeBanner: false,
+            theme: themeProvider.isDarkMode ? _darkTheme : _lightTheme,
+            home: StreamBuilder<User?>(
+              stream: FirebaseAuth.instance.authStateChanges(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (userSnapshot.hasData && userSnapshot.data!.exists) {
-                  final data =
-                      userSnapshot.data!.data() as Map<String, dynamic>;
-                  final role = data['role'];
+                if (snapshot.hasData) {
                   return FutureBuilder<DocumentSnapshot>(
                     future: FirebaseFirestore.instance
-                        .collection('agents')
+                        .collection('users')
                         .doc(snapshot.data!.uid)
                         .get(),
-                    builder: (context, agentSnapshot) {
-                      if (agentSnapshot.connectionState ==
+                    builder: (context, userSnapshot) {
+                      if (userSnapshot.connectionState ==
                           ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
                       }
-                      if (agentSnapshot.hasData && agentSnapshot.data!.exists) {
-                        return const AgentHomeScreen();
-                      } else if (role == 'user') {
-                        return const HomeScreen();
+                      if (userSnapshot.hasData && userSnapshot.data!.exists) {
+                        final data =
+                            userSnapshot.data!.data() as Map<String, dynamic>;
+                        final role = data['role'];
+                        if (role == 'agent') {
+                          return FutureBuilder<DocumentSnapshot>(
+                            future: FirebaseFirestore.instance
+                                .collection('agents')
+                                .doc(snapshot.data!.uid)
+                                .get(),
+                            builder: (context, agentSnapshot) {
+                              if (agentSnapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              }
+                              if (agentSnapshot.hasData &&
+                                  agentSnapshot.data!.exists) {
+                                return const AgentHomeScreen();
+                              } else {
+                                return const RoleSelectionScreen();
+                              }
+                            },
+                          );
+                        } else if (role == 'user') {
+                          return const HomeScreen();
+                        } else {
+                          return const RoleSelectionScreen();
+                        }
                       } else {
                         return const RoleSelectionScreen();
                       }
                     },
                   );
-                } else {
-                  return const RoleSelectionScreen();
                 }
+                return const LoginScreen();
               },
-            );
-          }
-          return const LoginScreen();
+            ),
+          );
         },
       ),
     );

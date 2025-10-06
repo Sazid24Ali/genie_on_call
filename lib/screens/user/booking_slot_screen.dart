@@ -3,7 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:geocoding/geocoding.dart'; // Import geocoding package
-import 'package:genie_on_call/screens/payment_screen.dart'; // Import the new PaymentScreen
+import 'package:geolocator/geolocator.dart'; // Import geolocator package
+import 'package:genie_on_call/screens/user/payment_screen.dart'; // Import the new PaymentScreen
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 class BookingSlotScreen extends StatefulWidget {
   final String serviceName;
@@ -34,6 +37,9 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
 
   List<DateTime> _datesWithAvailableSlots = [];
 
+  LatLng? _selectedLocation;
+  final MapController _mapController = MapController();
+
   @override
   void initState() {
     super.initState();
@@ -54,7 +60,7 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
     try {
       final userDoc = await _firestore
           .collection('users')
-          .doc(_currentUser.uid)
+          .doc(_currentUser!.uid)
           .get();
       if (userDoc.exists) {
         setState(() {
@@ -90,8 +96,9 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
               setState(() {
                 _userAddress = address;
                 _addressController.text = address;
+                _selectedLocation = LatLng(lat, lon);
               });
-              await _firestore.collection('users').doc(_currentUser.uid).set({
+              await _firestore.collection('users').doc(_currentUser!.uid).set({
                 'address': address,
                 'lastUpdated': FieldValue.serverTimestamp(),
               }, SetOptions(merge: true));
@@ -103,6 +110,125 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
       }
     } catch (e) {
       print("Error fetching user data: $e");
+    }
+    _initializeLocation();
+  }
+
+  Future<void> _initializeLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied ||
+            permission == LocationPermission.deniedForever) {
+          // Use user saved or default
+          if (_selectedLocation == null) {
+            setState(() {
+              _selectedLocation = LatLng(28.6139, 77.2090); // default
+            });
+          }
+          return;
+        }
+      }
+      Position pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      setState(() {
+        _selectedLocation = LatLng(pos.latitude, pos.longitude);
+      });
+      // Also update address
+      try {
+        List<Placemark> placemarks = await placemarkFromCoordinates(
+          pos.latitude,
+          pos.longitude,
+        );
+        if (placemarks.isNotEmpty) {
+          final Placemark place = placemarks.first;
+          final String address =
+              [
+                    place.street,
+                    place.subLocality,
+                    place.locality,
+                    place.administrativeArea,
+                    place.postalCode,
+                    place.country,
+                  ]
+                  .where((element) => element != null && element.isNotEmpty)
+                  .join(', ');
+          setState(() {
+            _userAddress = address;
+            _addressController.text = address;
+          });
+        }
+      } catch (e) {
+        print("Error reverse geocoding current location: $e");
+      }
+    } catch (e) {
+      print("Error getting location: $e");
+      if (_selectedLocation == null) {
+        setState(() {
+          _selectedLocation = LatLng(28.6139, 77.2090);
+        });
+      }
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        // Request permission
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied ||
+            permission == LocationPermission.deniedForever) {
+          // Show error or default
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission denied')),
+          );
+          return;
+        }
+      }
+      Position pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      setState(() {
+        _selectedLocation = LatLng(pos.latitude, pos.longitude);
+      });
+      // Update address
+      try {
+        List<Placemark> placemarks = await placemarkFromCoordinates(
+          pos.latitude,
+          pos.longitude,
+        );
+        if (placemarks.isNotEmpty) {
+          final Placemark place = placemarks.first;
+          final String address =
+              [
+                    place.street,
+                    place.subLocality,
+                    place.locality,
+                    place.administrativeArea,
+                    place.postalCode,
+                    place.country,
+                  ]
+                  .where((element) => element != null && element.isNotEmpty)
+                  .join(', ');
+          setState(() {
+            _userAddress = address;
+            _addressController.text = address;
+          });
+        }
+      } catch (e) {
+        print("Error reverse geocoding current location: $e");
+      }
+      // Move map to current location
+      _mapController.move(_selectedLocation!, 15.0);
+    } catch (e) {
+      print("Error getting current location: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to get current location')),
+      );
     }
   }
 
@@ -214,6 +340,36 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
     }
   }
 
+  void _onMapTap(TapPosition tapPosition, LatLng position) async {
+    setState(() {
+      _selectedLocation = position;
+    });
+
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+      if (placemarks.isNotEmpty) {
+        final Placemark place = placemarks.first;
+        final String address = [
+          place.street,
+          place.subLocality,
+          place.locality,
+          place.administrativeArea,
+          place.postalCode,
+          place.country,
+        ].where((element) => element != null && element.isNotEmpty).join(', ');
+        setState(() {
+          _userAddress = address;
+          _addressController.text = address;
+        });
+      }
+    } catch (e) {
+      print("Error during reverse geocoding on map tap: $e");
+    }
+  }
+
   Future<void> _proceedToPayment() async {
     if (_currentUser == null) {
       showDialog(
@@ -310,10 +466,12 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
     }
 
     try {
-      await _firestore.collection('users').doc(_currentUser.uid).set({
+      await _firestore.collection('users').doc(_currentUser!.uid).set({
         'name': _nameController.text,
         'address': _addressController.text,
-        'phoneNumber': _currentUser.phoneNumber,
+        'latitude': _selectedLocation?.latitude,
+        'longitude': _selectedLocation?.longitude,
+        'phoneNumber': _currentUser!.phoneNumber,
         'lastUpdated': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (e) {
@@ -367,18 +525,24 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Book Your Slot',
           style: TextStyle(
             fontFamily: 'Montserrat',
-            color: Colors.black87,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black87,
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.black87),
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        iconTheme: IconThemeData(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.white
+              : Colors.black87,
+        ),
         elevation: 1,
       ),
       body: SingleChildScrollView(
@@ -398,11 +562,13 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
                   children: [
                     Text(
                       'Service: ${widget.serviceName}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'Montserrat',
-                        fontSize: 18,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : Colors.black87,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -424,9 +590,11 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
               'Your Details:',
               style: TextStyle(
                 fontFamily: 'Montserrat',
-                fontSize: 18,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black87,
               ),
             ),
             const SizedBox(height: 12),
@@ -467,13 +635,73 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
               maxLines: 2,
             ),
             const SizedBox(height: 24),
+            SizedBox(
+              height: 200,
+              child: Stack(
+                children: [
+                  FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      initialCenter:
+                          _selectedLocation ?? LatLng(28.6139, 77.2090),
+                      initialZoom: 15.0,
+                      onTap: _onMapTap,
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: "com.example.genie_on_call",
+                      ),
+                      MarkerLayer(
+                        markers: _selectedLocation != null
+                            ? [
+                                Marker(
+                                  point: _selectedLocation!,
+                                  child: const Icon(
+                                    Icons.location_pin,
+                                    color: Colors.red,
+                                    size: 40,
+                                  ),
+                                ),
+                              ]
+                            : [],
+                      ),
+                    ],
+                  ),
+                  Positioned(
+                    bottom: 16,
+                    right: 16,
+                    child: FloatingActionButton(
+                      onPressed: _getCurrentLocation,
+                      backgroundColor: Colors.blueAccent,
+                      child: const Icon(Icons.my_location, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Latitude: ${_selectedLocation?.latitude?.toStringAsFixed(6) ?? 'N/A'}, Longitude: ${_selectedLocation?.longitude?.toStringAsFixed(6) ?? 'N/A'}',
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 14,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white70
+                    : Colors.black54,
+              ),
+            ),
+            const SizedBox(height: 16),
             Text(
               'Select Date:',
               style: TextStyle(
                 fontFamily: 'Montserrat',
-                fontSize: 18,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black87,
               ),
             ),
             const SizedBox(height: 12),
@@ -532,9 +760,11 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
               'Select Time Slot:',
               style: TextStyle(
                 fontFamily: 'Montserrat',
-                fontSize: 18,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black87,
               ),
             ),
             const SizedBox(height: 12),
@@ -576,11 +806,17 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? Colors.blueAccent
+                                : Theme.of(context).brightness ==
+                                      Brightness.dark
+                                ? Theme.of(context).cardColor
                                 : Colors.white,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: isSelected
                                   ? Colors.blueAccent
+                                  : Theme.of(context).brightness ==
+                                        Brightness.dark
+                                  ? Colors.grey.withOpacity(0.6)
                                   : Colors.grey.withOpacity(0.4),
                               width: 1.5,
                             ),
@@ -597,7 +833,12 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
                             timeSlot,
                             style: TextStyle(
                               fontFamily: 'Montserrat',
-                              color: isSelected ? Colors.white : Colors.black87,
+                              color: isSelected
+                                  ? Colors.white
+                                  : Theme.of(context).brightness ==
+                                        Brightness.dark
+                                  ? Colors.white
+                                  : Colors.black87,
                               fontWeight: isSelected
                                   ? FontWeight.bold
                                   : FontWeight.normal,

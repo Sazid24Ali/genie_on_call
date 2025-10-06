@@ -2,8 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart'; // Import Firebase Messaging
-import 'settings_screen.dart'; // This will now be the 'BookingsScreen' conceptually
+import 'user_bookings_screen.dart';
 import 'service_details_screen.dart';
+import 'settings_screen.dart';
 import 'package:genie_on_call/screens/login_screen.dart'; // Import LoginScreen for logout navigation
 
 // Helper function to map icon strings from Firestore to IconData
@@ -257,18 +258,24 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Genie On Call',
           style: TextStyle(
             fontFamily: 'Montserrat',
-            color: Colors.black87,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black87,
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.black87),
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        iconTheme: IconThemeData(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.white
+              : Colors.black87,
+        ),
         elevation: 1,
       ),
       drawer: _buildDrawer(context), // Call the drawer builder
@@ -279,10 +286,28 @@ class _HomeScreenState extends State<HomeScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(
+              child: Text(
+                'Error: ${snapshot.error}',
+                style: TextStyle(
+                  color:
+                      Theme.of(context).textTheme.bodyLarge?.color ??
+                      Colors.black87,
+                ),
+              ),
+            );
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("No services available."));
+            return Center(
+              child: Text(
+                "No services available.",
+                style: TextStyle(
+                  color:
+                      Theme.of(context).textTheme.bodyLarge?.color ??
+                      Colors.black87,
+                ),
+              ),
+            );
           }
 
           final services = snapshot.data!.docs;
@@ -338,11 +363,15 @@ class _HomeScreenState extends State<HomeScreen> {
                           Text(
                             serviceName,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'Montserrat',
                               fontWeight: FontWeight.w600,
                               fontSize: 16,
-                              color: Colors.black87,
+                              color:
+                                  Theme.of(
+                                    context,
+                                  ).textTheme.bodyLarge?.color ??
+                                  Colors.black87,
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -409,9 +438,15 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.home_rounded, color: Colors.blueAccent),
-            title: const Text(
+            title: Text(
               'Home',
-              style: TextStyle(fontFamily: 'Montserrat', fontSize: 16),
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 16,
+                color:
+                    Theme.of(context).textTheme.bodyLarge?.color ??
+                    Colors.black87,
+              ),
             ),
             onTap: () {
               Navigator.pop(context); // Close the drawer
@@ -421,53 +456,48 @@ class _HomeScreenState extends State<HomeScreen> {
             leading: const Icon(
               Icons.book_online_rounded,
               color: Colors.blueAccent,
-            ), // Changed icon
-            title: const Text(
-              'My Bookings', // Changed text
-              style: TextStyle(fontFamily: 'Montserrat', fontSize: 16),
+            ),
+            title: Text(
+              'My Bookings',
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 16,
+                color:
+                    Theme.of(context).textTheme.bodyLarge?.color ??
+                    Colors.black87,
+              ),
             ),
             onTap: () {
               Navigator.pop(context); // Close the drawer
-              if (_userPhoneNumber != null) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => SettingsScreen(
-                      // Still uses SettingsScreen, but it's now conceptually 'BookingsScreen'
-                      phoneNumber: _userPhoneNumber!,
-                    ),
-                  ),
-                );
-              } else {
-                showDialog(
-                  context: context,
-                  builder: (dialogContext) => AlertDialog(
-                    title: const Text(
-                      'Error',
-                      style: TextStyle(
-                        fontFamily: 'Montserrat',
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    content: const Text(
-                      'User phone number not available. Please try logging in again.',
-                      style: TextStyle(fontFamily: 'Montserrat'),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(dialogContext).pop(),
-                        child: const Text(
-                          'OK',
-                          style: TextStyle(
-                            fontFamily: 'Montserrat',
-                            color: Colors.blueAccent,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const UserBookingsScreen(),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(
+              Icons.settings_rounded,
+              color: Colors.blueAccent,
+            ),
+            title: Text(
+              'Settings',
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 16,
+                color:
+                    Theme.of(context).textTheme.bodyLarge?.color ??
+                    Colors.black87,
+              ),
+            ),
+            onTap: () {
+              Navigator.pop(context); // Close the drawer
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
             },
           ),
           const Expanded(

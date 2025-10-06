@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/intl.dart';
+import 'package:geolocator/geolocator.dart';
 import 'agent_bookings_screen.dart';
+import 'agent_earnings_screen.dart';
 import 'agent_profile_screen.dart';
-import 'login_screen.dart';
+import 'agent_settings_screen.dart';
+import '../login_screen.dart';
 
 // Helper function to map icon strings from Firestore to IconData
 IconData getIconData(String iconName) {
@@ -65,6 +68,10 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
   int _acceptedJobs = 0;
   double _earnings = 0.0;
 
+  List<int> ranges = [5, 10, 15, 20, 25];
+  int _selectedRange = 10;
+  Position? _agentPosition;
+
   bool _isInitialDataFetched = false;
 
   @override
@@ -76,9 +83,10 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_isInitialDataFetched || ModalRoute.of(context)?.isCurrent == true) {
+    if (!_isInitialDataFetched) {
       _fetchAgentData();
       _fetchStats();
+      _getAgentLocation();
       _isInitialDataFetched = true;
     }
   }
@@ -135,11 +143,39 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
         });
 
         // Pending bookings without agentId (for potential jobs)
-        setState(() {
-        });
+        setState(() {});
       } catch (e) {
         print("Error fetching stats: $e");
       }
+    }
+  }
+
+  Future<void> _getAgentLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied ||
+            permission == LocationPermission.deniedForever) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Location permissions are required to filter jobs by distance.',
+              ),
+            ),
+          );
+          return;
+        }
+      }
+      _agentPosition = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      setState(() {});
+    } catch (e) {
+      print("Error getting location: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error getting location: $e')));
     }
   }
 
@@ -291,18 +327,21 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Genie On Call - Agent',
           style: TextStyle(
             fontFamily: 'Montserrat',
-            color: Colors.black87,
+            color:
+                Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black87,
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.black87),
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        iconTheme: IconThemeData(
+          color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black87,
+        ),
         elevation: 1,
       ),
       drawer: _buildDrawer(context),
@@ -315,72 +354,105 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
             Row(
               children: [
                 Expanded(
-                  child: Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        children: [
-                          const Icon(Icons.work, color: Colors.green, size: 32),
-                          const SizedBox(height: 8),
-                          Text(
-                            '$_acceptedJobs',
-                            style: const TextStyle(
-                              fontFamily: 'Montserrat',
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const AgentBookingsScreen(initialTab: 'Accepted'),
+                        ),
+                      );
+                    },
+                    child: Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.work,
+                              color: Colors.green,
+                              size: 32,
                             ),
-                          ),
-                          const Text(
-                            'Accepted Jobs',
-                            style: TextStyle(
-                              fontFamily: 'Montserrat',
-                              fontSize: 14,
-                              color: Colors.grey,
+                            const SizedBox(height: 8),
+                            Text(
+                              '$_acceptedJobs',
+                              style: const TextStyle(
+                                fontFamily: 'Montserrat',
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                        ],
+                            Text(
+                              'Accepted Jobs',
+                              style: TextStyle(
+                                fontFamily: 'Montserrat',
+                                fontSize: 14,
+                                color:
+                                    Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall?.color ??
+                                    Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        children: [
-                          const Icon(
-                            Icons.attach_money,
-                            color: Colors.green,
-                            size: 32,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '₹${_earnings.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              fontFamily: 'Montserrat',
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AgentEarningsScreen(),
+                        ),
+                      );
+                    },
+                    child: Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.attach_money,
+                              color: Colors.green,
+                              size: 32,
                             ),
-                          ),
-                          const Text(
-                            'Earnings',
-                            style: TextStyle(
-                              fontFamily: 'Montserrat',
-                              fontSize: 14,
-                              color: Colors.grey,
+                            const SizedBox(height: 8),
+                            Text(
+                              '₹${_earnings.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontFamily: 'Montserrat',
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                        ],
+                            Text(
+                              'Earnings',
+                              style: TextStyle(
+                                fontFamily: 'Montserrat',
+                                fontSize: 14,
+                                color:
+                                    Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall?.color ??
+                                    Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -388,152 +460,209 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            const Text(
-              'My Services',
-              style: TextStyle(
-                fontFamily: 'Montserrat',
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
+            // My Services Expandable Section
+            ExpansionTile(
+              title: Text(
+                'My Services',
+                style: TextStyle(
+                  fontFamily: 'Montserrat',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color:
+                      Theme.of(context).textTheme.bodyLarge?.color ??
+                      Colors.black87,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            StreamBuilder<QuerySnapshot>(
-              stream: _firestore.collection('services').snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text("No services available."));
-                }
-
-                final services = snapshot.data!.docs;
-                final filteredServices = services.where((doc) {
-                  final serviceName = doc['name'] ?? '';
-                  return _agentServices.contains(serviceName);
-                }).toList();
-
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: filteredServices.length + 1,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 18,
-                    crossAxisSpacing: 18,
-                    childAspectRatio: 0.9,
-                  ),
-                  itemBuilder: (context, index) {
-                    if (index == filteredServices.length) {
-                      // Add service tile
-                      return Card(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        elevation: 4,
-                        shadowColor: Colors.greenAccent.withOpacity(0.1),
-                        child: InkWell(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const AgentProfileScreen(),
-                              ),
-                            );
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                CircleAvatar(
-                                  backgroundColor: Colors.grey.withOpacity(0.1),
-                                  radius: 28,
-                                  child: const Icon(
-                                    Icons.add,
-                                    size: 32,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                const Text(
-                                  'Add Service',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontFamily: 'Montserrat',
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 16,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    } else {
-                      final service =
-                          filteredServices[index].data()
-                              as Map<String, dynamic>;
-                      final serviceName = service['name'] ?? 'Unknown Service';
-                      final serviceIconName = service['icon'] ?? '';
-
-                      return Card(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        elevation: 4,
-                        shadowColor: Colors.greenAccent.withOpacity(0.1),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              CircleAvatar(
-                                backgroundColor: Colors.greenAccent.withOpacity(
-                                  0.08,
-                                ),
-                                radius: 28,
-                                child: Icon(
-                                  getIconData(serviceIconName),
-                                  size: 32,
-                                  color: Colors.green,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                serviceName,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontFamily: 'Montserrat',
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 16,
-                                  color: Colors.black87,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
+              children: [
+                StreamBuilder<QuerySnapshot>(
+                  stream: _firestore.collection('services').snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    }
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return const Center(
+                        child: Text("No services available."),
                       );
                     }
+
+                    final services = snapshot.data!.docs;
+                    final filteredServices = services.where((doc) {
+                      final serviceName = doc['name'] ?? '';
+                      return _agentServices.contains(serviceName);
+                    }).toList();
+
+                    return GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: filteredServices.length + 1,
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 18,
+                            crossAxisSpacing: 18,
+                            childAspectRatio: 0.9,
+                          ),
+                      itemBuilder: (context, index) {
+                        if (index == filteredServices.length) {
+                          // Add service tile
+                          return Card(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            elevation: 4,
+                            shadowColor: Colors.greenAccent.withOpacity(0.1),
+                            child: InkWell(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const AgentProfileScreen(),
+                                  ),
+                                );
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    CircleAvatar(
+                                      backgroundColor: Colors.grey.withOpacity(
+                                        0.1,
+                                      ),
+                                      radius: 28,
+                                      child: const Icon(
+                                        Icons.add,
+                                        size: 32,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    const Text(
+                                      'Add Service',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontFamily: 'Montserrat',
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 16,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        } else {
+                          final service =
+                              filteredServices[index].data()
+                                  as Map<String, dynamic>;
+                          final serviceName =
+                              service['name'] ?? 'Unknown Service';
+                          final serviceIconName = service['icon'] ?? '';
+
+                          return Card(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            elevation: 4,
+                            shadowColor: Colors.greenAccent.withOpacity(0.1),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: Colors.greenAccent
+                                        .withOpacity(0.08),
+                                    radius: 28,
+                                    child: Icon(
+                                      getIconData(serviceIconName),
+                                      size: 32,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    serviceName,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontFamily: 'Montserrat',
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).textTheme.bodyLarge?.color ??
+                                          Colors.black87,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                    );
                   },
-                );
-              },
+                ),
+              ],
             ),
             const SizedBox(height: 24),
-            const Text(
+            // Distance Range Selector
+            Row(
+              children: [
+                Text(
+                  'Distance Range: ',
+                  style: TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color:
+                        Theme.of(context).textTheme.bodyLarge?.color ??
+                        Colors.black87,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                DropdownButton<int>(
+                  value: _selectedRange,
+                  items: ranges.map((int range) {
+                    return DropdownMenuItem<int>(
+                      value: range,
+                      child: Text(
+                        '$range km',
+                        style: const TextStyle(
+                          fontFamily: 'Montserrat',
+                          fontSize: 16,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (int? newValue) {
+                    if (newValue != null) {
+                      setState(() {
+                        _selectedRange = newValue;
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Text(
               'Nearby Jobs',
               style: TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                color:
+                    Theme.of(context).textTheme.bodyLarge?.color ??
+                    Colors.black87,
               ),
             ),
             const SizedBox(height: 16),
@@ -551,21 +680,58 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text("No nearby jobs available."));
+                  return Center(
+                    child: Text(
+                      "No nearby jobs available.",
+                      style: TextStyle(
+                        color:
+                            Theme.of(context).textTheme.bodyLarge?.color ??
+                            Colors.black87,
+                      ),
+                    ),
+                  );
                 }
 
                 final bookings = snapshot.data!.docs;
-                // Updated: substring match for serviceName
+                // Updated: substring match for serviceName and distance filter
                 final filteredBookings = bookings.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
                   final serviceName = data['serviceName'] ?? '';
-                  return _agentServices.any(
+                  bool serviceMatch = _agentServices.any(
                     (agentService) => serviceName.contains(agentService),
                   );
+                  if (!serviceMatch) return false;
+
+                  if (_agentPosition == null) {
+                    return true; // if no location, show all
+                  }
+
+                  final userLat = data['userLat'] as double?;
+                  final userLng = data['userLng'] as double?;
+                  if (userLat == null || userLng == null) return false;
+
+                  final distance =
+                      Geolocator.distanceBetween(
+                        _agentPosition!.latitude,
+                        _agentPosition!.longitude,
+                        userLat,
+                        userLng,
+                      ) /
+                      1000; // in km
+                  return distance <= _selectedRange;
                 }).toList();
 
                 if (filteredBookings.isEmpty) {
-                  return const Center(child: Text("No matching jobs."));
+                  return Center(
+                    child: Text(
+                      "No matching jobs.",
+                      style: TextStyle(
+                        color:
+                            Theme.of(context).textTheme.bodyLarge?.color ??
+                            Colors.black87,
+                      ),
+                    ),
+                  );
                 }
 
                 return ListView.builder(
@@ -615,11 +781,15 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                                 Expanded(
                                   child: Text(
                                     service,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontFamily: 'Montserrat',
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.black87,
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).textTheme.bodyLarge?.color ??
+                                          Colors.black87,
                                     ),
                                   ),
                                 ),
@@ -646,10 +816,14 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                             const SizedBox(height: 4),
                             Text(
                               description,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: 'Montserrat',
                                 fontSize: 14,
-                                color: Colors.black87,
+                                color:
+                                    Theme.of(
+                                      context,
+                                    ).textTheme.bodyLarge?.color ??
+                                    Colors.black87,
                               ),
                               maxLines: 4,
                               overflow: TextOverflow.ellipsis,
@@ -754,9 +928,9 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
           ),
 
           ListTile(
-            leading: const Icon(Icons.work_rounded, color: Colors.green),
+            leading: const Icon(Icons.book_online_rounded, color: Colors.green),
             title: const Text(
-              'My Jobs',
+              'My Bookings',
               style: TextStyle(fontFamily: 'Montserrat', fontSize: 16),
             ),
             onTap: () {
@@ -779,48 +953,23 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
             ),
             onTap: () {
               Navigator.pop(context);
-              // For now, show a simple dialog with earnings
-              showDialog(
-                context: context,
-                builder: (dialogContext) => AlertDialog(
-                  title: const Text(
-                    'My Earnings',
-                    style: TextStyle(
-                      fontFamily: 'Montserrat',
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  content: Text(
-                    'Total Earnings: ₹${_earnings.toStringAsFixed(0)}',
-                    style: const TextStyle(fontFamily: 'Montserrat'),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      child: const Text(
-                        'OK',
-                        style: TextStyle(
-                          fontFamily: 'Montserrat',
-                          color: Colors.green,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AgentEarningsScreen()),
               );
             },
           ),
           ListTile(
-            leading: const Icon(Icons.person_rounded, color: Colors.green),
+            leading: const Icon(Icons.settings_rounded, color: Colors.green),
             title: const Text(
-              'Profile',
+              'Settings',
               style: TextStyle(fontFamily: 'Montserrat', fontSize: 16),
             ),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const AgentProfileScreen()),
+                MaterialPageRoute(builder: (_) => const AgentSettingsScreen()),
               );
             },
           ),

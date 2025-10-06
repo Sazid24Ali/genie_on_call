@@ -3,9 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'role_selection_screen.dart';
-import 'home_screen.dart';
-import 'agent_profile_screen.dart';
-import 'agent_home_screen.dart';
+import 'user/home_screen.dart';
+import 'agent/agent_profile_screen.dart';
+import 'agent/agent_home_screen.dart';
 
 class OTPScreen extends StatefulWidget {
   final String verificationId;
@@ -28,35 +28,80 @@ class _OTPScreenState extends State<OTPScreen> {
 
   Future<void> _saveUserData(User user) async {
     try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied ||
-            permission == LocationPermission.deniedForever) {
-          // Handle cases where permission is denied
-          print("Location permissions are denied or denied forever.");
-          // You might want to show an alert here as well
-          // For now, proceed without location if permission is denied
+      final userDoc = await _firestore.collection("users").doc(user.uid).get();
+      final bool isAgent = widget.selectedRole == 'agent';
+
+      // For agent, always require location permission and update location
+      if (isAgent) {
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+          if (permission == LocationPermission.denied ||
+              permission == LocationPermission.deniedForever) {
+            // Handle cases where permission is denied
+            print("Location permissions are denied or denied forever.");
+            // You might want to show an alert here as well
+            // For now, proceed without location if permission is denied
+            await _firestore.collection("users").doc(user.uid).set({
+              "phone": user.phoneNumber,
+              "role": widget.selectedRole,
+              "createdAt": FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+            return;
+          }
+        }
+
+        Position pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+
+        await _firestore.collection("users").doc(user.uid).set({
+          "phone": user.phoneNumber,
+          "role": widget.selectedRole,
+          "latitude": pos.latitude,
+          "longitude": pos.longitude,
+          "createdAt": FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } else {
+        // For user, only ask location permission and save location if first time (no lat/lng saved)
+        if (!userDoc.exists ||
+            userDoc.data()?['latitude'] == null ||
+            userDoc.data()?['longitude'] == null) {
+          LocationPermission permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.denied) {
+            permission = await Geolocator.requestPermission();
+            if (permission == LocationPermission.denied ||
+                permission == LocationPermission.deniedForever) {
+              print("Location permissions are denied or denied forever.");
+              await _firestore.collection("users").doc(user.uid).set({
+                "phone": user.phoneNumber,
+                "role": widget.selectedRole,
+                "createdAt": FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+              return;
+            }
+          }
+
+          Position pos = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high,
+          );
+
+          await _firestore.collection("users").doc(user.uid).set({
+            "phone": user.phoneNumber,
+            "role": widget.selectedRole,
+            "latitude": pos.latitude,
+            "longitude": pos.longitude,
+            "createdAt": FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        } else {
+          // Location already saved, just update phone and role
           await _firestore.collection("users").doc(user.uid).set({
             "phone": user.phoneNumber,
             "role": widget.selectedRole,
             "createdAt": FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
-          return;
         }
       }
-
-      Position pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-
-      await _firestore.collection("users").doc(user.uid).set({
-        "phone": user.phoneNumber,
-        "role": widget.selectedRole,
-        "latitude": pos.latitude,
-        "longitude": pos.longitude,
-        "createdAt": FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
     } catch (e) {
       print("Error saving user data or getting location: $e");
       // Even if location fails, try to save phone number and role
@@ -197,17 +242,19 @@ class _OTPScreenState extends State<OTPScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Verify OTP',
           style: TextStyle(
             fontFamily: 'Montserrat',
-            color: Colors.black87,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black87,
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 1,
       ),
       body: SingleChildScrollView(
@@ -218,14 +265,16 @@ class _OTPScreenState extends State<OTPScreen> {
           children: [
             const SizedBox(height: 50),
             const SizedBox(height: 40),
-            const Text(
+            Text(
               "Enter the 6-digit code sent to your phone number",
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: Colors.black87,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black87,
               ),
             ),
             const SizedBox(height: 24),
@@ -260,11 +309,13 @@ class _OTPScreenState extends State<OTPScreen> {
                 ),
                 counterText: "", // Hide the default maxLength counter
               ),
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 20,
                 letterSpacing: 10,
-                color: Colors.black87,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black87,
               ),
             ),
             const SizedBox(height: 32),

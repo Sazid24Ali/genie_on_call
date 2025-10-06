@@ -6,7 +6,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
 
 class AgentBookingsScreen extends StatefulWidget {
-  const AgentBookingsScreen({super.key});
+  const AgentBookingsScreen({super.key, this.initialTab = 'Accepted'});
+
+  final String initialTab;
 
   @override
   State<AgentBookingsScreen> createState() => _AgentBookingsScreenState();
@@ -15,7 +17,13 @@ class AgentBookingsScreen extends StatefulWidget {
 class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  String _selectedTab = 'Accepted'; // 'Accepted', 'Finished'
+  late String _selectedTab; // 'Accepted', 'Finished'
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedTab = widget.initialTab;
+  }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> _fetchBookingsStream() {
     if (_auth.currentUser == null) {
@@ -42,13 +50,35 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
 
   Future<void> _finishBooking(String bookingId) async {
     try {
+      // First, get the booking details to get the cost
+      DocumentSnapshot bookingDoc = await _firestore
+          .collection('bookings')
+          .doc(bookingId)
+          .get();
+      if (!bookingDoc.exists) {
+        throw 'Booking not found';
+      }
+      Map<String, dynamic> bookingData =
+          bookingDoc.data() as Map<String, dynamic>;
+      num cost = bookingData['cost'] ?? 0;
+
+      // Update the booking status
       await _firestore.collection('bookings').doc(bookingId).update({
         'status': 'Finished',
         'finishedAt': FieldValue.serverTimestamp(),
       });
+
+      // Update agent's earnings
+      String agentId = _auth.currentUser!.uid;
+      await _firestore.collection('agents').doc(agentId).update({
+        'totalEarnings': FieldValue.increment(cost),
+      });
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Booking marked as finished!')),
+          const SnackBar(
+            content: Text('Booking marked as finished and earnings updated!'),
+          ),
         );
       }
     } catch (e) {
@@ -279,18 +309,24 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'My Jobs',
           style: TextStyle(
             fontFamily: 'Montserrat',
-            color: Colors.black87,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black87,
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.black87),
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        iconTheme: IconThemeData(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.white
+              : Colors.black87,
+        ),
         elevation: 1,
       ),
       body: Column(
@@ -390,10 +426,12 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
                         _selectedTab == 'Accepted'
                             ? 'No accepted jobs.'
                             : 'No finished jobs.',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'Montserrat',
                           fontSize: 16,
-                          color: Colors.grey,
+                          color:
+                              Theme.of(context).textTheme.bodyLarge?.color ??
+                              Colors.black87,
                         ),
                       ),
                     ),
@@ -420,12 +458,19 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
   }
 
   Widget _buildDetailRow(IconData icon, String label, String value) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.grey[600], size: 18),
+          Icon(
+            icon,
+            color: isDark
+                ? Colors.black87
+                : Colors.grey[600], // Dark icons in dark mode
+            size: 18,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text.rich(
@@ -442,10 +487,12 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
                   ),
                   TextSpan(
                     text: value,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'Montserrat',
                       fontSize: 14,
-                      color: Colors.black54,
+                      fontWeight:
+                          FontWeight.bold, // More bold white data in dark mode
+                      color: isDark ? Colors.white : Colors.black54,
                     ),
                   ),
                 ],

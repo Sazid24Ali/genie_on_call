@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'home_screen.dart';
-import 'agent_home_screen.dart'; // Will create this later
-import 'agent_profile_screen.dart'; // Will create this later
+import 'user/home_screen.dart';
+import 'agent/agent_home_screen.dart';
+import 'agent/agent_profile_screen.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});

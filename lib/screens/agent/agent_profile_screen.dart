@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'agent_home_screen.dart'; // Will create later
+import 'agent_home_screen.dart';
 
 class AgentProfileScreen extends StatefulWidget {
   const AgentProfileScreen({super.key});
@@ -295,7 +295,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text(
-          'Agent Profile Setup',
+          'Agent Profile',
           style: TextStyle(
             fontFamily: 'Montserrat',
             color: Colors.black87,
@@ -311,7 +311,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Complete your profile to start as an agent',
+              'Manage your profile and services',
               style: TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 16,
