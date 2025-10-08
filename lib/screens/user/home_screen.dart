@@ -6,6 +6,12 @@ import 'user_bookings_screen.dart';
 import 'service_details_screen.dart';
 import 'settings_screen.dart';
 import 'package:genie_on_call/screens/login_screen.dart'; // Import LoginScreen for logout navigation
+import 'package:genie_on_call/screens/chat_screen.dart'; // Import ChatScreen
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
+import '../../l10n/app_localizations.dart';
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../widgets/language_selector.dart';
 
 // Helper function to map icon strings from Firestore to IconData
 IconData getIconData(String iconName) {
@@ -261,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
-          'Genie On Call',
+          AppLocalizations.of(context).appTitle,
           style: TextStyle(
             fontFamily: 'Montserrat',
             color: Theme.of(context).brightness == Brightness.dark
@@ -277,6 +283,7 @@ class _HomeScreenState extends State<HomeScreen> {
               : Colors.black87,
         ),
         elevation: 1,
+        actions: [LanguageSelector()],
       ),
       drawer: _buildDrawer(context), // Call the drawer builder
       body: StreamBuilder<QuerySnapshot>(
@@ -300,7 +307,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return Center(
               child: Text(
-                "No services available.",
+                AppLocalizations.of(context).noServicesAvailable,
                 style: TextStyle(
                   color:
                       Theme.of(context).textTheme.bodyLarge?.color ??
@@ -386,10 +393,12 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
       ),
+      floatingActionButton: const FloatingChatButton(),
     );
   }
 
   Widget _buildDrawer(BuildContext context) {
+    final loc = AppLocalizations.of(context);
     return Drawer(
       child: Column(
         children: <Widget>[
@@ -415,7 +424,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    _userName ?? 'Guest User', // This will now update correctly
+                    _userName ?? loc.customer, // This will now update correctly
                     style: const TextStyle(
                       fontFamily: 'Montserrat',
                       color: Colors.white,
@@ -425,7 +434,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   Text(
                     _userPhoneNumber ??
-                        'N/A', // This will also update correctly
+                        loc.notProvided, // This will also update correctly
                     style: const TextStyle(
                       fontFamily: 'Montserrat',
                       color: Colors.white70,
@@ -439,7 +448,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ListTile(
             leading: const Icon(Icons.home_rounded, color: Colors.blueAccent),
             title: Text(
-              'Home',
+              loc.home,
               style: TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 16,
@@ -458,7 +467,7 @@ class _HomeScreenState extends State<HomeScreen> {
               color: Colors.blueAccent,
             ),
             title: Text(
-              'My Bookings',
+              loc.myBookings,
               style: TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 16,
@@ -478,12 +487,97 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.chat_rounded, color: Colors.greenAccent),
+            title: Text(
+              loc.chat,
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 16,
+                color:
+                    Theme.of(context).textTheme.bodyLarge?.color ??
+                    Colors.black87,
+              ),
+            ),
+            onTap: () {
+              Navigator.pop(context); // Close the drawer
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ChatScreen()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.language, color: Colors.blueAccent),
+            title: Text(
+              loc.language,
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 16,
+                color:
+                    Theme.of(context).textTheme.bodyLarge?.color ??
+                    Colors.black87,
+              ),
+            ),
+            trailing: Consumer<ThemeProvider>(
+              builder: (context, themeProvider, child) {
+                return DropdownButton<String>(
+                  value: themeProvider.languageKey,
+                  items: const [
+                    DropdownMenuItem(value: 'en', child: Text('English')),
+                    DropdownMenuItem(value: 'hi', child: Text('Hindi')),
+                    DropdownMenuItem(value: 'te', child: Text('Telugu')),
+                    DropdownMenuItem(value: 'en-T', child: Text('Tenglish')),
+                    DropdownMenuItem(value: 'en-H', child: Text('Hinglish')),
+                  ],
+                  onChanged: (String? newValue) async {
+                    if (newValue == null) return;
+                    final languageLabel = (newValue == 'en')
+                        ? 'English'
+                        : (newValue == 'hi')
+                        ? 'Hindi'
+                        : (newValue == 'te')
+                        ? 'Telugu'
+                        : (newValue == 'en-T')
+                        ? 'Tenglish'
+                        : 'Hinglish';
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (dialogContext) => AlertDialog(
+                        title: Text(loc.languageChangeDialogTitle),
+                        content: Text(
+                          loc.languageChangeDialogContent(languageLabel),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.of(dialogContext).pop(false),
+                            child: Text(loc.cancel),
+                          ),
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.of(dialogContext).pop(true),
+                            child: Text(loc.confirm),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true) themeProvider.setLanguage(newValue);
+                  },
+                  style: const TextStyle(
+                    fontFamily: 'Montserrat',
+                    color: Colors.black87,
+                  ),
+                );
+              },
+            ),
+          ),
+          ListTile(
             leading: const Icon(
               Icons.settings_rounded,
               color: Colors.blueAccent,
             ),
             title: Text(
-              'Settings',
+              loc.settings,
               style: TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 16,
@@ -506,9 +600,9 @@ class _HomeScreenState extends State<HomeScreen> {
           const Divider(), // Add a divider for visual separation
           ListTile(
             leading: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-            title: const Text(
-              'Logout',
-              style: TextStyle(
+            title: Text(
+              loc.logout,
+              style: const TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 16,
                 color: Colors.redAccent,

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'booking_slot_screen.dart';
+import 'booking_slot_screen.dart' hide AppLocalizations;
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
+import '../../widgets/language_selector.dart';
+import '../../l10n/app_localizations.dart';
 
 // Helper to map icon string to IconData (ensure this function is also in home_screen.dart or a common utility file)
 IconData getIconData(String iconName) {
@@ -84,6 +87,7 @@ class ServiceDetailsScreen extends StatelessWidget {
               : Colors.black87,
         ),
         elevation: 1,
+        actions: [LanguageSelector()],
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
@@ -99,8 +103,8 @@ class ServiceDetailsScreen extends StatelessWidget {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(
-              child: Text("No sub-services found for this service."),
+            return Center(
+              child: Text(AppLocalizations.of(context).noSubServicesFound),
             );
           }
 
@@ -110,8 +114,8 @@ class ServiceDetailsScreen extends StatelessWidget {
           );
 
           if (subServices.isEmpty) {
-            return const Center(
-              child: Text("No sub-services defined for this service."),
+            return Center(
+              child: Text(AppLocalizations.of(context).noSubServicesDefined),
             );
           }
 
@@ -405,6 +409,7 @@ class ServiceDetailsScreen extends StatelessWidget {
           );
         },
       ),
+      floatingActionButton: const FloatingChatButton(),
     );
   }
 }

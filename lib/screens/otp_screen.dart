@@ -6,6 +6,7 @@ import 'role_selection_screen.dart';
 import 'user/home_screen.dart';
 import 'agent/agent_profile_screen.dart';
 import 'agent/agent_home_screen.dart';
+import '../../widgets/language_selector.dart';
 
 class OTPScreen extends StatefulWidget {
   final String verificationId;
@@ -256,6 +257,7 @@ class _OTPScreenState extends State<OTPScreen> {
         ),
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 1,
+        actions: [LanguageSelector()],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),

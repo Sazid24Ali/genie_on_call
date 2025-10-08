@@ -8,7 +8,13 @@ import 'agent_bookings_screen.dart';
 import 'agent_earnings_screen.dart';
 import 'agent_profile_screen.dart';
 import 'agent_settings_screen.dart';
+import '../../l10n/app_localizations.dart';
 import '../login_screen.dart';
+import '../chat_screen.dart'; // Import ChatScreen
+import '../../widgets/floating_chat_button.dart';
+import '../../widgets/language_selector.dart';
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
 
 // Helper function to map icon strings from Firestore to IconData
 IconData getIconData(String iconName) {
@@ -158,9 +164,9 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
         if (permission == LocationPermission.denied ||
             permission == LocationPermission.deniedForever) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Text(
-                'Location permissions are required to filter jobs by distance.',
+                AppLocalizations.of(context).locationPermissionContent,
               ),
             ),
           );
@@ -173,9 +179,13 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
       setState(() {});
     } catch (e) {
       print("Error getting location: $e");
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error getting location: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context).errorGettingLocation(e.toString()),
+          ),
+        ),
+      );
     }
   }
 
@@ -187,15 +197,19 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
         'acceptedAt': FieldValue.serverTimestamp(),
       });
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Booking accepted!')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context).bookingAccepted)),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error accepting booking: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context).errorAcceptingBooking(e.toString()),
+            ),
+          ),
+        );
       }
     }
   }
@@ -234,10 +248,11 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
         print(
           'Message also contained a notification: ${message.notification!.title} - ${message.notification!.body}',
         );
+        final loc = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              message.notification!.title ?? 'New Notification',
+              message.notification!.title ?? loc.newNotification,
               style: const TextStyle(
                 fontFamily: 'Montserrat',
                 color: Colors.white,
@@ -246,7 +261,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
             backgroundColor: Colors.greenAccent.shade700,
             duration: const Duration(seconds: 5),
             action: SnackBarAction(
-              label: 'VIEW',
+              label: loc.view,
               textColor: Colors.white,
               onPressed: () {
                 // Navigate to bookings
@@ -279,26 +294,30 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
   // --- FCM Methods End ---
 
   void _showLogoutConfirmationDialog() {
+    final loc = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text(
-          'Logout',
-          style: TextStyle(
+        title: Text(
+          loc.logout,
+          style: const TextStyle(
             fontFamily: 'Montserrat',
             fontWeight: FontWeight.bold,
           ),
         ),
-        content: const Text(
-          'Are you sure you want to log out?',
-          style: TextStyle(fontFamily: 'Montserrat'),
+        content: Text(
+          loc.logoutConfirmationContent,
+          style: const TextStyle(fontFamily: 'Montserrat'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(fontFamily: 'Montserrat', color: Colors.grey),
+            child: Text(
+              loc.cancel,
+              style: const TextStyle(
+                fontFamily: 'Montserrat',
+                color: Colors.grey,
+              ),
             ),
           ),
           ElevatedButton(
@@ -314,9 +333,12 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            child: const Text(
-              'Logout',
-              style: TextStyle(fontFamily: 'Montserrat', color: Colors.white),
+            child: Text(
+              loc.logout,
+              style: const TextStyle(
+                fontFamily: 'Montserrat',
+                color: Colors.white,
+              ),
             ),
           ),
         ],
@@ -326,11 +348,12 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
-          'Genie On Call - Agent',
+          '${loc.appTitle} - ${loc.agent}',
           style: TextStyle(
             fontFamily: 'Montserrat',
             color:
@@ -343,6 +366,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
           color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black87,
         ),
         elevation: 1,
+        actions: [LanguageSelector()],
       ),
       drawer: _buildDrawer(context),
       body: SingleChildScrollView(
@@ -388,7 +412,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                               ),
                             ),
                             Text(
-                              'Accepted Jobs',
+                              loc.acceptedJobs,
                               style: TextStyle(
                                 fontFamily: 'Montserrat',
                                 fontSize: 14,
@@ -440,7 +464,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                               ),
                             ),
                             Text(
-                              'Earnings',
+                              loc.earnings,
                               style: TextStyle(
                                 fontFamily: 'Montserrat',
                                 fontSize: 14,
@@ -463,7 +487,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
             // My Services Expandable Section
             ExpansionTile(
               title: Text(
-                'My Services',
+                AppLocalizations.of(context).myServices,
                 style: TextStyle(
                   fontFamily: 'Montserrat',
                   fontSize: 18,
@@ -481,11 +505,19 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                       return const Center(child: CircularProgressIndicator());
                     }
                     if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
+                      return Center(
+                        child: Text(
+                          AppLocalizations.of(
+                            context,
+                          ).error.replaceFirst('{error}', '${snapshot.error}'),
+                        ),
+                      );
                     }
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return const Center(
-                        child: Text("No services available."),
+                      return Center(
+                        child: Text(
+                          AppLocalizations.of(context).noServicesAvailable,
+                        ),
                       );
                     }
 
@@ -541,8 +573,8 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 10),
-                                    const Text(
-                                      'Add Service',
+                                    Text(
+                                      loc.addService,
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontFamily: 'Montserrat',
@@ -618,7 +650,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
             Row(
               children: [
                 Text(
-                  'Distance Range: ',
+                  loc.distanceRangeLabel,
                   style: TextStyle(
                     fontFamily: 'Montserrat',
                     fontSize: 16,
@@ -635,7 +667,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                     return DropdownMenuItem<int>(
                       value: range,
                       child: Text(
-                        '$range km',
+                        '$range ${loc.km}',
                         style: const TextStyle(
                           fontFamily: 'Montserrat',
                           fontSize: 16,
@@ -655,7 +687,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'Nearby Jobs',
+              loc.nearbyJobs,
               style: TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 18,
@@ -677,12 +709,14 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
+                  return Center(
+                    child: Text(loc.genericError(snapshot.error.toString())),
+                  );
                 }
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                   return Center(
                     child: Text(
-                      "No nearby jobs available.",
+                      loc.noNearbyJobs,
                       style: TextStyle(
                         color:
                             Theme.of(context).textTheme.bodyLarge?.color ??
@@ -724,7 +758,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                 if (filteredBookings.isEmpty) {
                   return Center(
                     child: Text(
-                      "No matching jobs.",
+                      loc.noMatchingJobs,
                       style: TextStyle(
                         color:
                             Theme.of(context).textTheme.bodyLarge?.color ??
@@ -757,7 +791,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                     final String userPhone =
                         booking['userPhone'] ?? 'Not provided';
                     final String description =
-                        'Date: $formattedDate\nTime: $bookingTime';
+                        '${loc.dateLabel}$formattedDate\n${loc.timeLabel}$bookingTime';
 
                     return Card(
                       shape: RoundedRectangleBorder(
@@ -806,7 +840,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Address : $location',
+                              '${loc.addressLabel}$location',
                               style: const TextStyle(
                                 fontFamily: 'Montserrat',
                                 fontSize: 14,
@@ -830,7 +864,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Name: $userName, Mobile: $userPhone',
+                              '${loc.nameLabel}$userName, ${loc.mobileLabel}$userPhone',
                               style: const TextStyle(
                                 fontFamily: 'Montserrat',
                                 fontSize: 12,
@@ -847,8 +881,8 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                                   Icons.check,
                                   color: Colors.white,
                                 ),
-                                label: const Text(
-                                  'Accept',
+                                label: Text(
+                                  loc.accept,
                                   style: TextStyle(
                                     fontFamily: 'Montserrat',
                                     color: Colors.white,
@@ -870,10 +904,12 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
           ],
         ),
       ),
+      floatingActionButton: const FloatingChatButton(),
     );
   }
 
   Widget _buildDrawer(BuildContext context) {
+    final loc = AppLocalizations.of(context);
     return Drawer(
       child: Column(
         children: <Widget>[
@@ -896,7 +932,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    _agentName ?? 'Agent User',
+                    _agentName ?? loc.agent,
                     style: const TextStyle(
                       fontFamily: 'Montserrat',
                       color: Colors.white,
@@ -905,7 +941,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                     ),
                   ),
                   Text(
-                    _agentPhoneNumber ?? 'N/A',
+                    _agentPhoneNumber ?? loc.notProvided,
                     style: const TextStyle(
                       fontFamily: 'Montserrat',
                       color: Colors.white70,
@@ -918,9 +954,15 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.home_rounded, color: Colors.green),
-            title: const Text(
-              'Home',
-              style: TextStyle(fontFamily: 'Montserrat', fontSize: 16),
+            title: Text(
+              loc.home,
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 16,
+                color:
+                    Theme.of(context).textTheme.bodyLarge?.color ??
+                    Colors.black87,
+              ),
             ),
             onTap: () {
               Navigator.pop(context);
@@ -929,9 +971,15 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
 
           ListTile(
             leading: const Icon(Icons.book_online_rounded, color: Colors.green),
-            title: const Text(
-              'My Bookings',
-              style: TextStyle(fontFamily: 'Montserrat', fontSize: 16),
+            title: Text(
+              loc.myBookings,
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 16,
+                color:
+                    Theme.of(context).textTheme.bodyLarge?.color ??
+                    Colors.black87,
+              ),
             ),
             onTap: () {
               Navigator.pop(context);
@@ -947,9 +995,15 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
               Icons.attach_money_rounded,
               color: Colors.green,
             ),
-            title: const Text(
-              'My Earnings',
-              style: TextStyle(fontFamily: 'Montserrat', fontSize: 16),
+            title: Text(
+              loc.myEarnings,
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 16,
+                color:
+                    Theme.of(context).textTheme.bodyLarge?.color ??
+                    Colors.black87,
+              ),
             ),
             onTap: () {
               Navigator.pop(context);
@@ -960,10 +1014,101 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.chat_rounded, color: Colors.greenAccent),
+            title: Text(
+              loc.chat,
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 16,
+                color:
+                    Theme.of(context).textTheme.bodyLarge?.color ??
+                    Colors.black87,
+              ),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ChatScreen()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.language, color: Colors.green),
+            title: Text(
+              loc.language,
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 16,
+                color:
+                    Theme.of(context).textTheme.bodyLarge?.color ??
+                    Colors.black87,
+              ),
+            ),
+            trailing: Consumer<ThemeProvider>(
+              builder: (context, themeProvider, child) {
+                return DropdownButton<String>(
+                  value: themeProvider.languageKey,
+                  items: [
+                    DropdownMenuItem(value: 'en', child: Text(loc.english)),
+                    DropdownMenuItem(value: 'hi', child: Text(loc.hindi)),
+                    DropdownMenuItem(value: 'te', child: Text(loc.telugu)),
+                    DropdownMenuItem(value: 'en-T', child: Text(loc.tenglish)),
+                    DropdownMenuItem(value: 'en-H', child: Text(loc.hinglish)),
+                  ],
+                  onChanged: (String? newValue) async {
+                    if (newValue == null) return;
+                    final languageLabel = (newValue == 'en')
+                        ? loc.english
+                        : (newValue == 'hi')
+                        ? loc.hindi
+                        : (newValue == 'te')
+                        ? loc.telugu
+                        : (newValue == 'en-T')
+                        ? loc.tenglish
+                        : loc.hinglish;
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (dialogContext) => AlertDialog(
+                        title: Text(loc.languageChangeDialogTitle),
+                        content: Text(
+                          loc.languageChangeDialogContent(languageLabel),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.of(dialogContext).pop(false),
+                            child: Text(loc.cancel),
+                          ),
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.of(dialogContext).pop(true),
+                            child: Text(loc.confirm),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true) themeProvider.setLanguage(newValue);
+                  },
+                  style: const TextStyle(
+                    fontFamily: 'Montserrat',
+                    color: Colors.black87,
+                  ),
+                );
+              },
+            ),
+          ),
+          ListTile(
             leading: const Icon(Icons.settings_rounded, color: Colors.green),
-            title: const Text(
-              'Settings',
-              style: TextStyle(fontFamily: 'Montserrat', fontSize: 16),
+            title: Text(
+              loc.settings,
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 16,
+                color:
+                    Theme.of(context).textTheme.bodyLarge?.color ??
+                    Colors.black87,
+              ),
             ),
             onTap: () {
               Navigator.pop(context);
@@ -977,9 +1122,9 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-            title: const Text(
-              'Logout',
-              style: TextStyle(
+            title: Text(
+              loc.logout,
+              style: const TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 16,
                 color: Colors.redAccent,

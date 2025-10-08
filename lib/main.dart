@@ -10,6 +10,7 @@ import 'package:genie_on_call/screens/role_selection_screen.dart';
 import 'package:genie_on_call/screens/agent/agent_home_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:genie_on_call/providers/theme_provider.dart';
+import 'l10n/app_localizations.dart';
 
 // final FirebaseAuth _auth = FirebaseAuth.instance;
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -141,6 +142,10 @@ class MyApp extends StatelessWidget {
             title: 'Genie On Call',
             debugShowCheckedModeBanner: false,
             theme: themeProvider.isDarkMode ? _darkTheme : _lightTheme,
+            // Localization wiring
+            locale: themeProvider.locale,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: StreamBuilder<User?>(
               stream: FirebaseAuth.instance.authStateChanges(),
               builder: (context, snapshot) {

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart'; // For date formatting
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
+import '../../l10n/app_localizations.dart';
+import '../../widgets/language_selector.dart';
 
 class PaymentScreen extends StatefulWidget {
   final String serviceName;
@@ -32,9 +35,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   Future<void> _finalizeBooking(String paymentMethod) async {
     if (_currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You must be logged in to book a service.'),
-        ),
+        SnackBar(content: Text(AppLocalizations.of(context).mustBeLoggedIn)),
       );
       return;
     }
@@ -85,22 +86,22 @@ class _PaymentScreenState extends State<PaymentScreen> {
         barrierDismissible: false, // User must tap button to dismiss
         builder: (BuildContext dialogContext) {
           return AlertDialog(
-            title: const Text(
-              'Booking Confirmed!',
-              style: TextStyle(
+            title: Text(
+              AppLocalizations.of(context).bookingConfirmedTitle,
+              style: const TextStyle(
                 fontFamily: 'Montserrat',
                 fontWeight: FontWeight.bold,
               ),
             ),
-            content: const Text(
-              'Service is booked, an executive will be assigned as soon as possible.',
-              style: TextStyle(fontFamily: 'Montserrat'),
+            content: Text(
+              AppLocalizations.of(context).bookingConfirmedMessage,
+              style: const TextStyle(fontFamily: 'Montserrat'),
             ),
             actions: <Widget>[
               TextButton(
-                child: const Text(
-                  'OK',
-                  style: TextStyle(
+                child: Text(
+                  AppLocalizations.of(context).okButtonLabel,
+                  style: const TextStyle(
                     fontFamily: 'Montserrat',
                     color: Colors.blueAccent,
                   ),
@@ -118,9 +119,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
         },
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to book service: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context).failedToBookService(e.toString()),
+          ),
+        ),
+      );
       print("Booking error: $e");
     }
   }
@@ -131,7 +136,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
-          'Select Payment Method',
+          AppLocalizations.of(context).selectPaymentMethod,
           style: TextStyle(
             fontFamily: 'Montserrat',
             color: Theme.of(context).brightness == Brightness.dark
@@ -147,6 +152,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               : Colors.black87,
         ),
         elevation: 1,
+        actions: [LanguageSelector()],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -287,6 +293,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ],
         ),
       ),
+      floatingActionButton: const FloatingChatButton(),
     );
   }
 }

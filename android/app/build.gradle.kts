@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.genie_on_call"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     defaultConfig {

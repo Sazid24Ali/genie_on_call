@@ -7,6 +7,8 @@ import 'package:genie_on_call/providers/theme_provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
+import '../../widgets/language_selector.dart';
 
 class UserBookingsScreen extends StatefulWidget {
   const UserBookingsScreen({super.key});
@@ -90,6 +92,7 @@ class _UserBookingsScreenState extends State<UserBookingsScreen> {
               : Colors.black87,
         ),
         elevation: 1,
+        actions: [LanguageSelector()],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -846,6 +849,7 @@ class _UserBookingsScreenState extends State<UserBookingsScreen> {
           ],
         ),
       ),
+      floatingActionButton: const FloatingChatButton(),
     );
   }
 

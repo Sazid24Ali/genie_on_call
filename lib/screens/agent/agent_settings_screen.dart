@@ -1,3 +1,4 @@
+import '../../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,7 +7,9 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:genie_on_call/providers/theme_provider.dart';
-import 'agent_home_screen.dart'; // Will create later
+import 'agent_home_screen.dart';
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
+import '../../widgets/language_selector.dart';
 
 const MethodChannel _platform = MethodChannel(
   'com.example.genie_on_call/settings',
@@ -343,6 +346,7 @@ class _AgentSettingsScreenState extends State<AgentSettingsScreen> {
               : Colors.black87,
         ),
         elevation: 1,
+        actions: [LanguageSelector()],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -531,6 +535,103 @@ class _AgentSettingsScreenState extends State<AgentSettingsScreen> {
 
             const SizedBox(height: 16),
 
+            // Language Selection
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Icon(Icons.language, color: Colors.blueAccent),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        'Language',
+                        style: const TextStyle(
+                          fontFamily: 'Montserrat',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    Consumer<ThemeProvider>(
+                      builder: (context, themeProvider, child) {
+                        return DropdownButton<String>(
+                          value: themeProvider.languageKey,
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'en',
+                              child: Text('English'),
+                            ),
+                            DropdownMenuItem(value: 'hi', child: Text('Hindi')),
+                            DropdownMenuItem(
+                              value: 'te',
+                              child: Text('Telugu'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'en-T',
+                              child: Text('Tenglish'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'en-H',
+                              child: Text('Hinglish'),
+                            ),
+                          ],
+                          onChanged: (String? newValue) async {
+                            if (newValue == null) return;
+                            final loc = AppLocalizations.of(context);
+                            final languageLabel = (newValue == 'en')
+                                ? 'English'
+                                : (newValue == 'hi')
+                                ? 'Hindi'
+                                : (newValue == 'te')
+                                ? 'Telugu'
+                                : (newValue == 'en-T')
+                                ? 'Tenglish'
+                                : 'Hinglish';
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (dialogContext) => AlertDialog(
+                                title: Text(loc.languageChangeDialogTitle),
+                                content: Text(
+                                  loc.languageChangeDialogContent(
+                                    languageLabel,
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(dialogContext).pop(false),
+                                    child: Text(loc.cancel),
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(dialogContext).pop(true),
+                                    child: Text(loc.confirm),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirmed == true)
+                              themeProvider.setLanguage(newValue);
+                          },
+                          style: const TextStyle(
+                            fontFamily: 'Montserrat',
+                            color: Colors.black87,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
             // Location Services Info
             Card(
               elevation: 2,
@@ -601,6 +702,7 @@ class _AgentSettingsScreenState extends State<AgentSettingsScreen> {
           ],
         ),
       ),
+      floatingActionButton: const FloatingChatButton(),
     );
   }
 }

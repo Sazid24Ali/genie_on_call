@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
+import 'package:genie_on_call/providers/theme_provider.dart';
+// import 'package:intl/intl.dart';
+import '../l10n/app_localizations.dart';
+import '../widgets/language_selector.dart';
 import 'otp_screen.dart';
 import 'user/home_screen.dart';
 import 'agent/agent_profile_screen.dart';
@@ -60,7 +65,9 @@ class _LoginScreenState extends State<LoginScreen> {
         }, SetOptions(merge: true));
       } else {
         // For user, only ask location permission and save location if first time (no lat/lng saved)
-        if (!userDoc.exists || userDoc.data()?['latitude'] == null || userDoc.data()?['longitude'] == null) {
+        if (!userDoc.exists ||
+            userDoc.data()?['latitude'] == null ||
+            userDoc.data()?['longitude'] == null) {
           LocationPermission permission = await Geolocator.checkPermission();
           if (permission == LocationPermission.denied) {
             permission = await Geolocator.requestPermission();
@@ -341,8 +348,83 @@ class _LoginScreenState extends State<LoginScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 50),
+        Consumer<ThemeProvider>(
+          builder: (context, themeProvider, child) {
+            return Column(
+              children: [
+                Text(
+                  AppLocalizations.of(context).selectLanguage,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButton<String>(
+                  // display the stored language code as a selected value label
+                  value: themeProvider.languageKey,
+                  items: const [
+                    DropdownMenuItem(value: 'en', child: Text('English')),
+                    DropdownMenuItem(value: 'hi', child: Text('Hindi')),
+                    DropdownMenuItem(value: 'te', child: Text('Telugu')),
+                    DropdownMenuItem(value: 'en-T', child: Text('Tenglish')),
+                    DropdownMenuItem(value: 'en-H', child: Text('Hinglish')),
+                  ],
+                  onChanged: (String? newValue) async {
+                    if (newValue == null) return;
+
+                    final loc = AppLocalizations.of(context);
+                    final languageLabel = (newValue == 'en')
+                        ? 'English'
+                        : (newValue == 'hi')
+                        ? 'Hindi'
+                        : (newValue == 'te')
+                        ? 'Telugu'
+                        : (newValue == 'en-T')
+                        ? 'Tenglish'
+                        : 'Hinglish';
+
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (dialogContext) => AlertDialog(
+                        title: Text(loc.languageChangeDialogTitle),
+                        content: Text(
+                          loc.languageChangeDialogContent(languageLabel),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.of(dialogContext).pop(false),
+                            child: Text(loc.cancel),
+                          ),
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.of(dialogContext).pop(true),
+                            child: Text(loc.confirm),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirmed == true) {
+                      themeProvider.setLanguage(newValue);
+                    }
+                  },
+                  style: const TextStyle(
+                    fontFamily: 'Montserrat',
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 40),
+              ],
+            );
+          },
+        ),
         Text(
-          "Choose how you want to use Genie On Call",
+          AppLocalizations.of(context).selectRole,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'Montserrat',
@@ -363,8 +445,10 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               elevation: 5,
             ),
-            child: const Text(
-              "Login as User",
+            child: Text(
+              AppLocalizations.of(
+                context,
+              ).continueAs(AppLocalizations.of(context).user),
               style: TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 18,
@@ -386,8 +470,10 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               elevation: 5,
             ),
-            child: const Text(
-              "Login as Agent",
+            child: Text(
+              AppLocalizations.of(
+                context,
+              ).continueAs(AppLocalizations.of(context).agent),
               style: TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 18,
@@ -409,7 +495,7 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 50),
         const SizedBox(height: 40),
         Text(
-          "Enter your phone number to continue",
+          AppLocalizations.of(context).enterPhoneNumber,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'Montserrat',
@@ -424,7 +510,7 @@ class _LoginScreenState extends State<LoginScreen> {
           keyboardType: TextInputType.phone,
           maxLength: 10,
           decoration: InputDecoration(
-            labelText: "Phone Number",
+            labelText: AppLocalizations.of(context).phoneNumber,
             hintText: "e.g., 9876543210",
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -480,8 +566,8 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             child: _isLoading
                 ? const CircularProgressIndicator(color: Colors.white)
-                : const Text(
-                    "Send OTP",
+                : Text(
+                    AppLocalizations.of(context).sendOTP,
                     style: TextStyle(
                       fontFamily: 'Montserrat',
                       fontSize: 18,
@@ -548,6 +634,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: () => setState(() => selectedRole = null),
                 )
               : null,
+          actions: [LanguageSelector()],
         ),
         body: SingleChildScrollView(
           // Added SingleChildScrollView

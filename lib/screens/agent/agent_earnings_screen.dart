@@ -2,6 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
+import '../../l10n/app_localizations.dart';
+import '../../widgets/language_selector.dart';
 
 // Helper function to map icon strings from Firestore to IconData
 IconData getIconData(String iconName) {
@@ -108,7 +111,7 @@ class _AgentEarningsScreenState extends State<AgentEarningsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'My Earnings',
+          AppLocalizations.of(context).myEarnings,
           style: TextStyle(
             fontFamily: 'Montserrat',
             color: Theme.of(context).brightness == Brightness.dark
@@ -124,6 +127,7 @@ class _AgentEarningsScreenState extends State<AgentEarningsScreen> {
               : Colors.black87,
         ),
         elevation: 1,
+        actions: [LanguageSelector()],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -146,7 +150,9 @@ class _AgentEarningsScreenState extends State<AgentEarningsScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Total: ₹${_totalEarnings.toStringAsFixed(0)}',
+                      AppLocalizations.of(
+                        context,
+                      ).earningsAmount(_totalEarnings.toStringAsFixed(0)),
                       style: const TextStyle(
                         fontFamily: 'Montserrat',
                         fontSize: 24,
@@ -209,6 +215,7 @@ class _AgentEarningsScreenState extends State<AgentEarningsScreen> {
           ],
         ),
       ),
+      floatingActionButton: const FloatingChatButton(),
     );
   }
 }

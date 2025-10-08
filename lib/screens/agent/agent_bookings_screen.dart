@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
+import '../../l10n/app_localizations.dart';
+import '../../widgets/language_selector.dart';
 
 class AgentBookingsScreen extends StatefulWidget {
   const AgentBookingsScreen({super.key, this.initialTab = 'Accepted'});
@@ -233,9 +235,11 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
                                     permission ==
                                         LocationPermission.deniedForever) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
+                                    SnackBar(
                                       content: Text(
-                                        'Location permissions are required for navigation',
+                                        AppLocalizations.of(
+                                          context,
+                                        ).locationPermissionContent,
                                       ),
                                     ),
                                   );
@@ -250,7 +254,9 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    'Error getting current location: $e',
+                                    AppLocalizations.of(
+                                      context,
+                                    ).errorGettingLocation(e.toString()),
                                   ),
                                 ),
                               );
@@ -288,8 +294,12 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
                                 );
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Could not launch maps app'),
+                                  SnackBar(
+                                    content: Text(
+                                      AppLocalizations.of(
+                                        context,
+                                      ).couldNotLaunchMaps,
+                                    ),
                                   ),
                                 );
                               }
@@ -328,6 +338,7 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
               : Colors.black87,
         ),
         elevation: 1,
+        actions: [LanguageSelector()],
       ),
       body: Column(
         children: [

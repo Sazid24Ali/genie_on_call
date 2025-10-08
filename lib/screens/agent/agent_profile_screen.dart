@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'agent_home_screen.dart';
+import '../../l10n/app_localizations.dart';
+import '../../widgets/language_selector.dart';
 
 class AgentProfileScreen extends StatefulWidget {
   const AgentProfileScreen({super.key});
@@ -43,9 +45,9 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
           // Handle permission denied
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
+              SnackBar(
                 content: Text(
-                  'Location permissions are required for agent profile.',
+                  AppLocalizations.of(context).locationPermissionContent,
                 ),
               ),
             );
@@ -62,9 +64,13 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error getting location: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context).errorGettingLocation(e.toString()),
+            ),
+          ),
+        );
       }
     } finally {
       setState(() {
@@ -226,9 +232,9 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text(
-                'Select Services',
-                style: TextStyle(
+              title: Text(
+                AppLocalizations.of(context).selectServices,
+                style: const TextStyle(
                   fontFamily: 'Montserrat',
                   fontWeight: FontWeight.bold,
                 ),
@@ -258,9 +264,9 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(
+                  child: Text(
+                    AppLocalizations.of(context).cancel,
+                    style: const TextStyle(
                       fontFamily: 'Montserrat',
                       color: Colors.grey,
                     ),
@@ -273,9 +279,9 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                     });
                     Navigator.of(dialogContext).pop();
                   },
-                  child: const Text(
-                    'Done',
-                    style: TextStyle(
+                  child: Text(
+                    AppLocalizations.of(context).done,
+                    style: const TextStyle(
                       fontFamily: 'Montserrat',
                       color: Colors.white,
                     ),
@@ -294,9 +300,9 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text(
-          'Agent Profile',
-          style: TextStyle(
+        title: Text(
+          AppLocalizations.of(context).agentProfile,
+          style: const TextStyle(
             fontFamily: 'Montserrat',
             color: Colors.black87,
             fontWeight: FontWeight.bold,
@@ -304,15 +310,16 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
         ),
         backgroundColor: Colors.white,
         elevation: 1,
+        actions: [LanguageSelector()],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Manage your profile and services',
-              style: TextStyle(
+            Text(
+              AppLocalizations.of(context).manageProfileAndServices,
+              style: const TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 16,
                 color: Colors.black54,
@@ -332,10 +339,10 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
             GestureDetector(
               onTap: _showServiceSelectionDialog,
               child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Services Offered',
-                  border: OutlineInputBorder(),
-                  labelStyle: TextStyle(fontFamily: 'Montserrat'),
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context).servicesOffered,
+                  border: const OutlineInputBorder(),
+                  labelStyle: const TextStyle(fontFamily: 'Montserrat'),
                 ),
                 child: Text(
                   selectedServices.isEmpty
@@ -349,10 +356,10 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
             TextField(
               controller: experienceController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Years of Experience',
-                border: OutlineInputBorder(),
-                labelStyle: TextStyle(fontFamily: 'Montserrat'),
+              decoration: InputDecoration(
+                labelText: AppLocalizations.of(context).yearsOfExperience,
+                border: const OutlineInputBorder(),
+                labelStyle: const TextStyle(fontFamily: 'Montserrat'),
               ),
               style: const TextStyle(fontFamily: 'Montserrat'),
             ),
@@ -362,10 +369,13 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                 Expanded(
                   child: Text(
                     _locationLoading
-                        ? 'Detecting location...'
+                        ? AppLocalizations.of(context).detectingLocation
                         : _currentPosition != null
-                        ? 'Location: ${_currentPosition!.latitude.toStringAsFixed(4)}, ${_currentPosition!.longitude.toStringAsFixed(4)}'
-                        : 'Location not detected',
+                        ? AppLocalizations.of(context).locationDisplay(
+                            _currentPosition!.latitude.toStringAsFixed(4),
+                            _currentPosition!.longitude.toStringAsFixed(4),
+                          )
+                        : AppLocalizations.of(context).locationNotDetected,
                     style: const TextStyle(fontFamily: 'Montserrat'),
                   ),
                 ),
@@ -390,9 +400,9 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                 ),
                 child: _isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        'Save Profile',
-                        style: TextStyle(
+                    : Text(
+                        AppLocalizations.of(context).saveProfile,
+                        style: const TextStyle(
                           fontFamily: 'Montserrat',
                           fontSize: 18,
                           fontWeight: FontWeight.bold,

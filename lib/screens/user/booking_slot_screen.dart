@@ -4,9 +4,18 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:geocoding/geocoding.dart'; // Import geocoding package
 import 'package:geolocator/geolocator.dart'; // Import geolocator package
-import 'package:genie_on_call/screens/user/payment_screen.dart'; // Import the new PaymentScreen
+import 'package:genie_on_call/screens/booking_success_screen.dart'; // Import the new BookingSuccessScreen
+import 'package:genie_on_call/screens/user/payment_screen.dart'; // Import PaymentScreen
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:image_picker/image_picker.dart';
+// Use record platform interface to call the platform implementation directly.
+import 'package:record_platform_interface/record_platform_interface.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'dart:io';
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
+import '../../widgets/language_selector.dart';
+import '../../l10n/app_localizations.dart';
 
 class BookingSlotScreen extends StatefulWidget {
   final String serviceName;
@@ -40,6 +49,14 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
   LatLng? _selectedLocation;
   final MapController _mapController = MapController();
 
+  // Description fields
+  final TextEditingController _descriptionController = TextEditingController();
+  List<XFile> _selectedImages = [];
+  String? _voiceFilePath;
+  bool _isRecording = false;
+  // recorder id used by record_platform_interface
+  final String _recorderId = 'booking_slot_recorder';
+  final AudioPlayer _audioPlayer = AudioPlayer();
   @override
   void initState() {
     super.initState();
@@ -51,6 +68,8 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
   void dispose() {
     _nameController.dispose();
     _addressController.dispose();
+    _descriptionController.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -93,11 +112,13 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
                       ]
                       .where((element) => element != null && element.isNotEmpty)
                       .join(', ');
-              setState(() {
-                _userAddress = address;
-                _addressController.text = address;
-                _selectedLocation = LatLng(lat, lon);
-              });
+              if (mounted) {
+                setState(() {
+                  _userAddress = address;
+                  _addressController.text = address;
+                  _selectedLocation = LatLng(lat, lon);
+                });
+              }
               await _firestore.collection('users').doc(_currentUser!.uid).set({
                 'address': address,
                 'lastUpdated': FieldValue.serverTimestamp(),
@@ -111,7 +132,7 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
     } catch (e) {
       print("Error fetching user data: $e");
     }
-    _initializeLocation();
+    await _initializeLocation();
   }
 
   Future<void> _initializeLocation() async {
@@ -121,10 +142,9 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied ||
             permission == LocationPermission.deniedForever) {
-          // Use user saved or default
           if (_selectedLocation == null) {
             setState(() {
-              _selectedLocation = LatLng(28.6139, 77.2090); // default
+              _selectedLocation = LatLng(28.6139, 77.2090);
             });
           }
           return;
@@ -133,10 +153,11 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
       Position pos = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
-      setState(() {
-        _selectedLocation = LatLng(pos.latitude, pos.longitude);
-      });
-      // Also update address
+      if (mounted) {
+        setState(() {
+          _selectedLocation = LatLng(pos.latitude, pos.longitude);
+        });
+      }
       try {
         List<Placemark> placemarks = await placemarkFromCoordinates(
           pos.latitude,
@@ -155,10 +176,12 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
                   ]
                   .where((element) => element != null && element.isNotEmpty)
                   .join(', ');
-          setState(() {
-            _userAddress = address;
-            _addressController.text = address;
-          });
+          if (mounted) {
+            setState(() {
+              _userAddress = address;
+              _addressController.text = address;
+            });
+          }
         }
       } catch (e) {
         print("Error reverse geocoding current location: $e");
@@ -184,7 +207,11 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
             permission == LocationPermission.deniedForever) {
           // Show error or default
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location permission denied')),
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context).locationPermissionDenied,
+              ),
+            ),
           );
           return;
         }
@@ -227,7 +254,11 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
     } catch (e) {
       print("Error getting current location: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to get current location')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context).failedToGetCurrentLocation,
+          ),
+        ),
       );
     }
   }
@@ -370,28 +401,95 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
     }
   }
 
-  Future<void> _proceedToPayment() async {
+  Future<void> _pickImages() async {
+    final ImagePicker picker = ImagePicker();
+    final List<XFile> images = await picker.pickMultiImage();
+    setState(() {
+      _selectedImages = images;
+    });
+  }
+
+  Future<void> _startRecording() async {
+    try {
+      final hasPerm = await RecordPlatform.instance.hasPermission(_recorderId);
+      if (!hasPerm) return;
+
+      final String path =
+          '${Directory.systemTemp.path}/recording_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+      await RecordPlatform.instance.create(_recorderId);
+
+      final config = RecordConfig(
+        encoder: AudioEncoder.aacLc,
+        bitRate: 128000,
+        sampleRate: 44100,
+        numChannels: 1,
+      );
+
+      await RecordPlatform.instance.start(_recorderId, config, path: path);
+
+      setState(() {
+        _isRecording = true;
+        _voiceFilePath = path;
+      });
+    } catch (e) {
+      print('Start recording error: $e');
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    try {
+      final path = await RecordPlatform.instance.stop(_recorderId);
+      setState(() {
+        _isRecording = false;
+        _voiceFilePath = path;
+      });
+      await RecordPlatform.instance.dispose(_recorderId);
+    } catch (e) {
+      print('Stop recording error: $e');
+    }
+  }
+
+  Future<void> _playRecording() async {
+    if (_voiceFilePath == null) return;
+    try {
+      await _audioPlayer.stop();
+      await _audioPlayer.play(DeviceFileSource(_voiceFilePath!));
+    } catch (e) {
+      print('Error playing audio: $e');
+    }
+  }
+
+  Future<void> _stopPlayback() async {
+    try {
+      await _audioPlayer.stop();
+    } catch (e) {
+      print('Error stopping audio: $e');
+    }
+  }
+
+  Future<void> _bookSlot() async {
     if (_currentUser == null) {
       showDialog(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text(
-            'Login Required',
-            style: TextStyle(
+          title: Text(
+            AppLocalizations.of(context).loginRequiredTitle,
+            style: const TextStyle(
               fontFamily: 'Montserrat',
               fontWeight: FontWeight.bold,
             ),
           ),
-          content: const Text(
-            'You must be logged in to book a service.',
-            style: TextStyle(fontFamily: 'Montserrat'),
+          content: Text(
+            AppLocalizations.of(context).mustBeLoggedIn,
+            style: const TextStyle(fontFamily: 'Montserrat'),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text(
-                'OK',
-                style: TextStyle(
+              child: Text(
+                AppLocalizations.of(context).okButtonLabel,
+                style: const TextStyle(
                   fontFamily: 'Montserrat',
                   color: Colors.blueAccent,
                 ),
@@ -466,6 +564,7 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
     }
 
     try {
+      // Update user details
       await _firestore.collection('users').doc(_currentUser!.uid).set({
         'name': _nameController.text,
         'address': _addressController.text,
@@ -503,7 +602,7 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
           ],
         ),
       );
-      print("User update error before payment: $e");
+      print("User update error: $e");
       return;
     }
 
@@ -519,6 +618,129 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
           userAddress: _addressController.text,
         ),
       ),
+    );
+  }
+
+  Widget _buildDescriptionSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${AppLocalizations.of(context).descriptionLabel} (${AppLocalizations.of(context).optionalLabel})',
+          style: TextStyle(
+            fontFamily: 'Montserrat',
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _descriptionController,
+          decoration: InputDecoration(
+            labelText: AppLocalizations.of(context).describeService,
+            hintText: AppLocalizations.of(context).describeServiceHint,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            prefixIcon: const Icon(Icons.description, color: Colors.blueAccent),
+            labelStyle: const TextStyle(fontFamily: 'Montserrat'),
+            hintStyle: const TextStyle(fontFamily: 'Montserrat'),
+          ),
+          style: const TextStyle(fontFamily: 'Montserrat'),
+          maxLines: 3,
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            ElevatedButton.icon(
+              onPressed: _pickImages,
+              icon: const Icon(Icons.image, color: Colors.white),
+              label: Text(AppLocalizations.of(context).addImages),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              onPressed: _isRecording ? _stopRecording : _startRecording,
+              icon: Icon(
+                _isRecording ? Icons.stop : Icons.mic,
+                color: Colors.white,
+              ),
+              label: Text(
+                _isRecording
+                    ? AppLocalizations.of(context).stopRecording
+                    : AppLocalizations.of(context).recordVoice,
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _isRecording ? Colors.red : Colors.blueAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_selectedImages.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: SizedBox(
+              height: 90,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _selectedImages.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final XFile file = _selectedImages[index];
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      File(file.path),
+                      width: 90,
+                      height: 90,
+                      fit: BoxFit.cover,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        if (_voiceFilePath != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _playRecording,
+                  icon: const Icon(Icons.play_arrow, color: Colors.white),
+                  label: Text(AppLocalizations.of(context).playRecording),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: _stopPlayback,
+                  icon: const Icon(Icons.stop, color: Colors.white),
+                  label: Text(AppLocalizations.of(context).stopPlayback),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
@@ -544,6 +766,7 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
               : Colors.black87,
         ),
         elevation: 1,
+        actions: [LanguageSelector()],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -585,6 +808,10 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 24),
+            // Description / images / voice recording section placed directly
+            // after the service card as requested.
+            _buildDescriptionSection(context),
             const SizedBox(height: 24),
             Text(
               'Your Details:',
@@ -849,12 +1076,13 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
                       );
                     },
                   ),
+            // description section moved earlier in the widget tree
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: _proceedToPayment,
+                onPressed: _bookSlot,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blueAccent,
                   shape: RoundedRectangleBorder(
@@ -863,7 +1091,7 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
                   elevation: 5,
                 ),
                 child: const Text(
-                  'Proceed to Payment',
+                  'Book Slot',
                   style: TextStyle(
                     fontFamily: 'Montserrat',
                     fontSize: 18,
@@ -876,6 +1104,7 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
           ],
         ),
       ),
+      floatingActionButton: const FloatingChatButton(),
     );
   }
 }

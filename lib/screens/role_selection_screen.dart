@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user/home_screen.dart';
 import 'agent/agent_home_screen.dart';
 import 'agent/agent_profile_screen.dart';
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
+import '../widgets/language_selector.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -123,6 +125,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
         ),
         backgroundColor: Colors.white,
         elevation: 1,
+        actions: [LanguageSelector()],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -194,6 +197,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
           ],
         ),
       ),
+      floatingActionButton: const FloatingChatButton(),
     );
   }
 }
