@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart'; // For date formatting
+import 'package:flutter/services.dart' show rootBundle;
+import 'dart:convert';
+import 'package:genie_on_call/utils/locale_utils.dart';
+import 'package:flutter/foundation.dart';
 import 'package:geocoding/geocoding.dart'; // Import geocoding package
 import 'package:geolocator/geolocator.dart'; // Import geolocator package
 import 'package:genie_on_call/screens/user/payment_screen.dart'; // Import the new PaymentScreen
@@ -45,6 +49,33 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
     super.initState();
     _fetchUserData();
     _fetchAvailableDates();
+    _loadLocalTranslations();
+  }
+
+  Locale _appLocale = const Locale('en');
+  Map<String, String> _localTranslations = {};
+
+  Future<void> _loadLocalTranslations() async {
+    try {
+      final tag = localeToTag(_appLocale); // e.g., en or hi-Latn
+      final path = 'assets/translations/$tag.json';
+      String raw;
+      try {
+        raw = await rootBundle.loadString(path);
+      } catch (e) {
+        // fallback to language code only
+        final path2 = 'assets/translations/${_appLocale.languageCode}.json';
+        raw = await rootBundle.loadString(path2);
+      }
+      final Map<String, dynamic> decoded = json.decode(raw);
+      setState(() {
+        _localTranslations = decoded.map(
+          (k, v) => MapEntry(k, v?.toString() ?? ''),
+        );
+      });
+    } catch (e) {
+      if (kDebugMode) print('Failed to load local translations: $e');
+    }
   }
 
   @override
@@ -256,6 +287,36 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
     } catch (e) {
       print("Error fetching available dates: $e");
     }
+  }
+
+  String t(String key, [String? fallback]) {
+    return _localTranslations[key] ?? fallback ?? key;
+  }
+
+  /// Read a localized field from a Firestore document map
+  String? getLocalizedField(
+    Map<String, dynamic> docData,
+    String field,
+    Locale locale, {
+    Locale fallback = const Locale('en'),
+  }) {
+    final raw = docData[field];
+    if (raw == null) return null;
+    if (raw is String) return raw;
+    if (raw is Map) {
+      final tag = localeToTag(locale);
+      if (raw.containsKey(tag) && raw[tag] != null) return raw[tag]?.toString();
+      if (raw.containsKey(locale.languageCode) &&
+          raw[locale.languageCode] != null)
+        return raw[locale.languageCode]?.toString();
+      final fbTag = localeToTag(fallback);
+      if (raw.containsKey(fbTag) && raw[fbTag] != null)
+        return raw[fbTag]?.toString();
+      if (raw.containsKey(fallback.languageCode) &&
+          raw[fallback.languageCode] != null)
+        return raw[fallback.languageCode]?.toString();
+    }
+    return null;
   }
 
   Future<void> _fetchTimeSlotsForDate(DateTime date) async {
@@ -528,7 +589,7 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
-          'Book Your Slot',
+          t('book_slot', 'Book Your Slot'),
           style: TextStyle(
             fontFamily: 'Montserrat',
             color: Theme.of(context).brightness == Brightness.dark
@@ -544,6 +605,39 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
               : Colors.black87,
         ),
         elevation: 1,
+        actions: [
+          // language selector available in the app bar
+          Padding(
+            padding: const EdgeInsets.only(right: 12.0),
+            child: Builder(
+              builder: (ctx) => IconButton(
+                icon: const Icon(Icons.language),
+                onPressed: () async {
+                  // show simple dialog with language dropdown
+                  showDialog<bool>(
+                    context: ctx,
+                    builder: (dctx) => AlertDialog(
+                      title: Text(
+                        t('change_language_confirm', 'Confirm language change'),
+                      ),
+                      content: const SizedBox.shrink(),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dctx, false),
+                          child: Text(t('cancel', 'Cancel')),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(dctx, true),
+                          child: Text(t('confirm', 'Confirm')),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -862,9 +956,9 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
                   ),
                   elevation: 5,
                 ),
-                child: const Text(
-                  'Proceed to Payment',
-                  style: TextStyle(
+                child: Text(
+                  t('proceed_to_payment', 'Proceed to Payment'),
+                  style: const TextStyle(
                     fontFamily: 'Montserrat',
                     fontSize: 18,
                     fontWeight: FontWeight.bold,

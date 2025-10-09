@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:genie_on_call/providers/theme_provider.dart';
+import 'package:genie_on_call/widgets/app_language_action.dart';
 import 'agent_home_screen.dart'; // Will create later
 
 const MethodChannel _platform = MethodChannel(
@@ -527,6 +528,36 @@ class _AgentSettingsScreenState extends State<AgentSettingsScreen> {
                   ),
                 );
               },
+            ),
+
+            const SizedBox(height: 16),
+
+            // Language Settings
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Icon(Icons.language, color: Colors.purple),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        'Language',
+                        style: TextStyle(
+                          fontFamily: 'Montserrat',
+                          fontSize: 16,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                    ),
+                    const AppLanguageAction(),
+                  ],
+                ),
+              ),
             ),
 
             const SizedBox(height: 16),

@@ -9,6 +9,7 @@ import 'agent_earnings_screen.dart';
 import 'agent_profile_screen.dart';
 import 'agent_settings_screen.dart';
 import '../login_screen.dart';
+import 'package:genie_on_call/widgets/app_language_action.dart';
 
 // Helper function to map icon strings from Firestore to IconData
 IconData getIconData(String iconName) {
@@ -343,6 +344,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
           color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black87,
         ),
         elevation: 1,
+        actions: const [AppLanguageAction()],
       ),
       drawer: _buildDrawer(context),
       body: SingleChildScrollView(

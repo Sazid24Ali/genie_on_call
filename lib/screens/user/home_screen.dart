@@ -6,6 +6,11 @@ import 'user_bookings_screen.dart';
 import 'service_details_screen.dart';
 import 'settings_screen.dart';
 import 'package:genie_on_call/screens/login_screen.dart'; // Import LoginScreen for logout navigation
+import 'package:genie_on_call/widgets/app_language_action.dart';
+import 'package:genie_on_call/widgets/translated_text.dart';
+import 'package:provider/provider.dart';
+import 'package:genie_on_call/providers/locale_provider.dart';
+import 'package:genie_on_call/utils/locale_utils.dart';
 
 // Helper function to map icon strings from Firestore to IconData
 IconData getIconData(String iconName) {
@@ -260,8 +265,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
-          'Genie On Call',
+        title: TranslatedText(
+          'app_title',
           style: TextStyle(
             fontFamily: 'Montserrat',
             color: Theme.of(context).brightness == Brightness.dark
@@ -277,6 +282,7 @@ class _HomeScreenState extends State<HomeScreen> {
               : Colors.black87,
         ),
         elevation: 1,
+        actions: const [AppLanguageAction()],
       ),
       drawer: _buildDrawer(context), // Call the drawer builder
       body: StreamBuilder<QuerySnapshot>(
@@ -438,8 +444,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.home_rounded, color: Colors.blueAccent),
-            title: Text(
-              'Home',
+            title: TranslatedText(
+              'home',
               style: TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 16,
@@ -457,8 +463,8 @@ class _HomeScreenState extends State<HomeScreen> {
               Icons.book_online_rounded,
               color: Colors.blueAccent,
             ),
-            title: Text(
-              'My Bookings',
+            title: TranslatedText(
+              'my_bookings',
               style: TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 16,
@@ -482,8 +488,8 @@ class _HomeScreenState extends State<HomeScreen> {
               Icons.settings_rounded,
               color: Colors.blueAccent,
             ),
-            title: Text(
-              'Settings',
+            title: TranslatedText(
+              'settings',
               style: TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 16,
@@ -506,8 +512,8 @@ class _HomeScreenState extends State<HomeScreen> {
           const Divider(), // Add a divider for visual separation
           ListTile(
             leading: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-            title: const Text(
-              'Logout',
+            title: TranslatedText(
+              'logout',
               style: TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 16,

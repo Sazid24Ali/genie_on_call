@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/services.dart';
 import '../../providers/theme_provider.dart';
+import '../../widgets/app_language_action.dart';
 
 const MethodChannel _platform = MethodChannel(
   'com.example.genie_on_call/settings',
@@ -168,6 +169,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onPressed: openNotificationSettings,
                       tooltip: 'Open Notification Settings',
                     ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Language Settings
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Icon(Icons.language, color: Colors.purple),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        'Language',
+                        style: TextStyle(
+                          fontFamily: 'Montserrat',
+                          fontSize: 16,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                    ),
+                    const AppLanguageAction(),
                   ],
                 ),
               ),

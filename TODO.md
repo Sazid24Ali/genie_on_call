@@ -1,11 +1,8 @@
-- [x] Location Permission Optimization: Modified login flow so users are only prompted for location permission on their first login. Agents continue to be prompted for location permission on every login. Changes applied to both login_screen.dart and otp_screen.dart
-- [x] Map Integration for Booking Screen: Initially implemented Google Maps integration. Replaced with open-source flutter_map to eliminate API key requirements. Map allows interactive location selection with reverse geocoding. Address field updates automatically when tapping map locations. Maintains all existing booking functionality (date/time selection, payment flow)
-- [x] Add imports for geolocator and permission_handler in booking_slot_screen.dart
-- [x] Add method to initialize location: check permission, get current if allowed, else from users, else default
-- [x] Modify initState to call \_initializeLocation
-- [x] Update map widget to handle initialCenter safely, perhaps with a default if null
-- [x] Add display of lat/lon below the map
-- [x] In \_onMapTap, update \_selectedLocation and address
-- [x] In \_proceedToPayment, save lat/lon to users collection
-- [x] Add floating action button for current location on map
-- [ ] Test the changes
+# TODO: Fix Translation Issues for Henglish, Tenglish, and Telugu
+
+## Tasks
+- [x] Refactor TranslatedText widget to StatefulWidget
+- [x] Store translation future in state
+- [x] Update future in didUpdateWidget when locale changes
+- [x] Verify locale provider notifyListeners triggers rebuilds
+- [x] Test logout text updates for Henglish, Tenglish, and Telugu

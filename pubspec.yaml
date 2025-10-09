@@ -49,8 +49,11 @@ dependencies:
   url_launcher: ^6.3.2
   permission_handler: ^12.0.1
   android_intent_plus: ^5.0.0
-  flutter_map : ^8.2.2
-  latlong2 : ^0.9.1
+  flutter_map: ^8.2.2
+  latlong2: ^0.9.1
+  translator: ^1.0.0
+  flutter_localizations:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:
@@ -95,6 +98,8 @@ flutter:
         - asset: assets/fonts/Montserrat-Regular.ttf
         - asset: assets/fonts/Montserrat-Bold.ttf
           weight: 700
+  assets:
+    - assets/translations/
   # fonts:
   #   - family: Schyler
   #     fonts:
