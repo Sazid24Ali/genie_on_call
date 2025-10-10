@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class AgentBookingsScreen extends StatefulWidget {
   const AgentBookingsScreen({super.key, this.initialTab = 'Accepted'});
@@ -18,11 +19,51 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   late String _selectedTab; // 'Accepted', 'Finished'
+  late AudioPlayer _audioPlayer;
+  bool _isPlaying = false;
 
   @override
   void initState() {
     super.initState();
     _selectedTab = widget.initialTab;
+    _audioPlayer = AudioPlayer();
+    _audioPlayer.onPlayerComplete.listen((event) {
+      setState(() {
+        _isPlaying = false;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _playRecording(String url) async {
+    try {
+      await _audioPlayer.play(UrlSource(url));
+      setState(() {
+        _isPlaying = true;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error playing recording: $e')));
+      }
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    try {
+      await _audioPlayer.stop();
+      setState(() {
+        _isPlaying = false;
+      });
+    } catch (e) {
+      // ignore
+    }
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> _fetchBookingsStream() {
@@ -164,6 +205,61 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
               'Address',
               booking['userAddress'] ?? 'N/A',
             ),
+            if (booking['images'] != null &&
+                (booking['images'] as List).isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Images:',
+                style: TextStyle(
+                  fontFamily: 'Montserrat',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 150,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: (booking['images'] as List).length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: Image.network(
+                        (booking['images'] as List)[index],
+                        width: 150,
+                        height: 150,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.error),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+            if (booking['recording'] != null) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Recording:',
+                style: TextStyle(
+                  fontFamily: 'Montserrat',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              IconButton(
+                icon: Icon(_isPlaying ? Icons.stop : Icons.play_arrow),
+                onPressed: _isPlaying
+                    ? _stopRecording
+                    : () => _playRecording(booking['recording']),
+                iconSize: 40,
+                color: Colors.blueAccent,
+              ),
+            ],
             Align(
               alignment: Alignment.bottomRight,
               child: _selectedTab == 'Accepted'

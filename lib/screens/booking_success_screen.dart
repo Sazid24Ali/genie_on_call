@@ -4,8 +4,8 @@ class BookingSuccessScreen extends StatelessWidget {
   const BookingSuccessScreen({super.key});
 
   void _goToHome(BuildContext context) {
-    // Navigate to home, assuming root is home or role selection
-    Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+    // Navigate back to the home screen by popping to the first route
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   @override

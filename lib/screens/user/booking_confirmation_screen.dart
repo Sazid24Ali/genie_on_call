@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:genie_on_call/screens/booking_success_screen.dart';
@@ -95,6 +96,29 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
     });
 
     try {
+      // Upload images to Firebase Storage
+      List<String> imageUrls = [];
+      for (String path in widget.images) {
+        String fileName = path.split('/').last;
+        Reference ref = FirebaseStorage.instance.ref().child(
+          'bookings/${_currentUser!.uid}/images/$fileName',
+        );
+        await ref.putFile(File(path));
+        String url = await ref.getDownloadURL();
+        imageUrls.add(url);
+      }
+
+      // Upload recording to Firebase Storage
+      String? recordingUrl;
+      if (widget.recording != null) {
+        String fileName = widget.recording!.split('/').last;
+        Reference ref = FirebaseStorage.instance.ref().child(
+          'bookings/${_currentUser!.uid}/recordings/$fileName',
+        );
+        await ref.putFile(File(widget.recording!));
+        recordingUrl = await ref.getDownloadURL();
+      }
+
       final bookingRef = await _firestore.collection('bookings').add({
         'userId': _currentUser!.uid,
         'userName': widget.name,
@@ -103,8 +127,8 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
         'serviceName': widget.serviceName,
         'cost': widget.cost,
         'description': widget.description,
-        'images': widget.images,
-        'recording': widget.recording,
+        'images': imageUrls,
+        'recording': recordingUrl,
         'selectedDate': widget.selectedDate,
         'selectedTimeSlot': widget.selectedTimeSlot,
         'status': 'pending',

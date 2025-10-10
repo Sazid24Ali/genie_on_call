@@ -1,16 +1,12 @@
-# TODO: Fix Map Controller Issue in Slot Selection Screen
+# TODO: Fix Images and Recordings Storage for Agent Accessibility
 
-## Steps to Complete
+## Pending Tasks
 
-- [x] Identify locations where `_mapController.move` is called directly in `lib/screens/user/slot_selection_screen.dart`.
-- [x] Wrap each `_mapController.move` call with `WidgetsBinding.instance.addPostFrameCallback` to ensure the map is initialized before moving.
-- [x] Locations to fix:
-  - In `_fetchUserData` after setting `_selectedLocation` from Firestore.
-  - In `_getCurrentLocation` after updating location.
-- [x] Add a small delay (100ms) inside addPostFrameCallback to ensure the map is fully ready before moving.
+## Completed Tasks
 
-## Progress Tracking
-
-- Applied the same fix as booking_details_screen to slot_selection_screen since this is the main booking flow.
-- Removed unused `_initializeLocation` method.
-- Made map rendering conditional on data loading to prevent null reference errors.
+- [x] Fixed "Go to Home" button navigation in BookingSuccessScreen
+- [x] Add Firebase Storage dependency to pubspec.yaml
+- [x] Modify booking_confirmation_screen.dart to upload images and recording to Firebase Storage and store URLs in Firestore
+- [x] Update agent_bookings_screen.dart to display images and recordings using URLs
+- [x] Test the upload flow and agent display (successful upload confirmed)
+- [x] Ensure proper error handling and permissions (try-catch blocks added, storage rules deployed)
