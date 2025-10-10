@@ -7,13 +7,14 @@ plugins {
 
 android {
     namespace = "com.example.genie_on_call"
-    compileSdk = flutter.compileSdkVersion
+    // Explicitly target API 36 to satisfy newer AndroidX artifact requirements
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "com.example.genie_on_call" // Replace with your actual application ID if different
         minSdk = 23 // Ensure this is at least 21 for modern Firebase features and desugaring
-        targetSdk = flutter.targetSdkVersion
+    targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         // testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

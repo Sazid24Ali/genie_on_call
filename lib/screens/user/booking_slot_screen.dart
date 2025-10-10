@@ -11,6 +11,12 @@ import 'package:geolocator/geolocator.dart'; // Import geolocator package
 import 'package:genie_on_call/screens/user/payment_screen.dart'; // Import the new PaymentScreen
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:record/record.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'dart:io';
 
 class BookingSlotScreen extends StatefulWidget {
   final String serviceName;
@@ -43,6 +49,17 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
 
   LatLng? _selectedLocation;
   final MapController _mapController = MapController();
+
+  // New fields for description, images, and voice recording
+  final TextEditingController _descriptionController = TextEditingController();
+  final ImagePicker _imagePicker = ImagePicker();
+  List<XFile> _pickedImages = [];
+
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  bool _isRecording = false;
+  String? _recordedFilePath;
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isPlaying = false;
 
   @override
   void initState() {
@@ -82,6 +99,9 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
   void dispose() {
     _nameController.dispose();
     _addressController.dispose();
+    _descriptionController.dispose();
+    _audioPlayer.dispose();
+    _audioRecorder.dispose();
     super.dispose();
   }
 
@@ -99,6 +119,11 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
           _userAddress = userDoc['address'];
           _nameController.text = _userName ?? '';
           _addressController.text = _userAddress ?? '';
+          // Load description if exists
+          if (userDoc.data()!.containsKey('description')) {
+            _descriptionController.text = userDoc['description'] ?? '';
+          }
+          // Load images and recording paths if needed (not implemented here)
         });
 
         if ((_userAddress == null || _userAddress!.isEmpty) &&
@@ -431,6 +456,73 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
     }
   }
 
+  Future<void> _pickImage() async {
+    final XFile? image = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+    );
+    if (image != null) {
+      setState(() {
+        _pickedImages.add(image);
+      });
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _pickedImages.removeAt(index);
+    });
+  }
+
+  Future<void> _startRecording() async {
+    if (await _audioRecorder.hasPermission()) {
+      final directory = await getApplicationDocumentsDirectory();
+      final path =
+          '${directory.path}/recording_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final config = RecordConfig(
+        encoder: AudioEncoder.aacLc,
+        bitRate: 128000,
+        sampleRate: 44100,
+      );
+      await _audioRecorder.start(config, path: path);
+      setState(() {
+        _isRecording = true;
+        _recordedFilePath = path;
+      });
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    // Stop the recorder and capture returned path (may be null)
+    final stoppedPath = await _audioRecorder.stop();
+    setState(() {
+      _isRecording = false;
+      // Prefer the returned path if available, otherwise keep existing
+      _recordedFilePath = stoppedPath ?? _recordedFilePath;
+    });
+  }
+
+  void _removeRecording() {
+    setState(() {
+      _recordedFilePath = null;
+    });
+  }
+
+  Future<void> _playRecording() async {
+    if (_recordedFilePath != null) {
+      if (_isPlaying) {
+        await _audioPlayer.stop();
+        setState(() {
+          _isPlaying = false;
+        });
+      } else {
+        await _audioPlayer.play(DeviceFileSource(_recordedFilePath!));
+        setState(() {
+          _isPlaying = true;
+        });
+      }
+    }
+  }
+
   Future<void> _proceedToPayment() async {
     if (_currentUser == null) {
       showDialog(
@@ -533,6 +625,9 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
         'latitude': _selectedLocation?.latitude,
         'longitude': _selectedLocation?.longitude,
         'phoneNumber': _currentUser!.phoneNumber,
+        'description': _descriptionController.text,
+        'images': _pickedImages.map((x) => x.path).toList(),
+        'recording': _recordedFilePath,
         'lastUpdated': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (e) {
@@ -679,6 +774,160 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 24),
+            Text(
+              t('additional_details', 'Additional Details'),
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _descriptionController,
+              decoration: InputDecoration(
+                labelText: t('service_description', 'Service Description'),
+                hintText: t(
+                  'describe_requirements',
+                  'Describe your requirements...',
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                prefixIcon: const Icon(
+                  Icons.description,
+                  color: Colors.blueAccent,
+                ),
+                labelStyle: const TextStyle(fontFamily: 'Montserrat'),
+                hintStyle: const TextStyle(fontFamily: 'Montserrat'),
+              ),
+              style: const TextStyle(fontFamily: 'Montserrat'),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _pickImage,
+                    icon: const Icon(Icons.image, color: Colors.white),
+                    label: Text(
+                      t('add_images', 'Add Images'),
+                      style: const TextStyle(
+                        fontFamily: 'Montserrat',
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blueAccent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (_pickedImages.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _pickedImages.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final image = entry.value;
+                  return Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(
+                          File(image.path),
+                          width: 150,
+                          height: 150,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: IconButton(
+                          icon: const Icon(Icons.close, color: Colors.red),
+                          onPressed: () => _removeImage(index),
+                          iconSize: 20,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isRecording ? _stopRecording : _startRecording,
+                    icon: Icon(
+                      _isRecording ? Icons.stop : Icons.mic,
+                      color: Colors.white,
+                    ),
+                    label: Text(
+                      _isRecording
+                          ? t('stop_recording', 'Stop Recording')
+                          : t('start_recording', 'Start Recording'),
+                      style: const TextStyle(
+                        fontFamily: 'Montserrat',
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isRecording
+                          ? Colors.redAccent
+                          : Colors.blueAccent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (!_isRecording && _recordedFilePath != null) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      _isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Colors.blueAccent,
+                    ),
+                    onPressed: _playRecording,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      t('recorded_audio', 'Recorded Audio'),
+                      style: const TextStyle(
+                        fontFamily: 'Montserrat',
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: _removeRecording,
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 24),
             Text(
               'Your Details:',
