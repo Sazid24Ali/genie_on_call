@@ -119,6 +119,16 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
         recordingUrl = await ref.getDownloadURL();
       }
 
+      // Create chat for the booking
+      final chatRef = await _firestore.collection('chats').add({
+        'participants': [
+          _currentUser!.uid,
+        ], // Initially only user, CX and agent will be added later
+        'type': 'service-specific',
+        'relatedBookingId': null, // Will set after booking creation
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
       final bookingRef = await _firestore.collection('bookings').add({
         'userId': _currentUser!.uid,
         'userName': widget.name,
@@ -132,8 +142,12 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
         'selectedDate': widget.selectedDate,
         'selectedTimeSlot': widget.selectedTimeSlot,
         'status': 'pending',
+        'chatId': chatRef.id,
         'createdAt': FieldValue.serverTimestamp(),
       });
+
+      // Update chat with relatedBookingId
+      await chatRef.update({'relatedBookingId': bookingRef.id});
 
       // Update user doc if needed
       await _firestore.collection('users').doc(_currentUser!.uid).update({

@@ -1,28 +1,20 @@
 import React, { useState } from "react";
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-} from "firebase/auth";
-import { auth } from "./firebase";
+import { signInWithCustomToken } from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
+import { auth, functions } from "./firebase";
 
 function Login() {
-  const [email, setEmail] = useState("");
+  const [cxId, setCxId] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   const handleSignIn = async (e) => {
     e.preventDefault();
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
-      setError(error.message);
-    }
-  };
-
-  const handleSignUp = async (e) => {
-    e.preventDefault();
-    try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const cxLogin = httpsCallable(functions, "cxLogin");
+      const result = await cxLogin({ cxId, password });
+      const customToken = result.data.customToken;
+      await signInWithCustomToken(auth, customToken);
     } catch (error) {
       setError(error.message);
     }
@@ -30,22 +22,23 @@ function Login() {
 
   return (
     <div>
-      <h2>Login</h2>
-      <form>
+      <h2>CX Login</h2>
+      <form onSubmit={handleSignIn}>
         <input
-          type="email"
-          placeholder="Email_"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          type="text"
+          placeholder="CX ID"
+          value={cxId}
+          onChange={(e) => setCxId(e.target.value)}
+          required
         />
         <input
           type="password"
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          required
         />
-        <button onClick={handleSignIn}>Sign In</button>
-        <button onClick={handleSignUp}>Sign Up</button>
+        <button type="submit">Sign In</button>
       </form>
       {error && <p>{error}</p>}
     </div>

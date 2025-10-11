@@ -17,17 +17,46 @@ service cloud.firestore {
     }
 
     // Bookings: allow read for authenticated users (app filters client-side)
+    // CX can read all bookings (assuming CX authenticated with role)
     match /bookings/{bookingId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow write, update, delete: if request.auth != null &&
         (resource.data.userId == request.auth.uid ||
-         resource.data.agentId == request.auth.uid);
+         resource.data.agentId == request.auth.uid ||
+         exists(/databases/$(database)/documents/cx_executives/$(request.auth.uid)));
     }
 
     // Available slots: allow read/write for authenticated users
     match /available_slots/{slotId} {
       allow read, write: if request.auth != null;
+    }
+
+    // CX Logins: allow read for login validation (insecure but simple for now; use Cloud Function in production)
+    match /cx_logins/{cxId} {
+      allow read: if true;
+      allow write: if false; // Only admin can write
+    }
+
+    // CX Executives: authenticated CX can read/write their own
+    match /cx_executives/{cxId} {
+      allow read, write: if request.auth != null && request.auth.uid == cxId;
+    }
+
+    // Chats: users, agents, CX can read/write if participant
+    match /chats/{chatId} {
+      allow read, write: if request.auth != null && 
+        (resource.data.participants.hasAny([request.auth.uid]) || 
+         exists(/databases/$(database)/documents/cx_executives/$(request.auth.uid)));
+      allow create: if request.auth != null;
+    }
+
+    // Chat messages subcollection
+    match /chats/{chatId}/messages/{messageId} {
+      allow read, write: if request.auth != null && 
+        (get(/databases/$(database)/documents/chats/$(chatId)).data.participants.hasAny([request.auth.uid]) ||
+         exists(/databases/$(database)/documents/cx_executives/$(request.auth.uid)));
+      allow create: if request.auth != null;
     }
   }
 }

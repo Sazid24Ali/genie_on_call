@@ -4,7 +4,9 @@ import {
 } from "firebase-functions/v2/firestore";
 import { getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
+import { getAuth } from "firebase-admin/auth";
 import { initializeApp } from "firebase-admin/app";
+import { onCall } from "firebase-functions/v2/https";
 
 initializeApp();
 
@@ -14,12 +16,14 @@ const messaging = getMessaging();
 // Function to calculate distance using Haversine formula
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Radius of the Earth in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon1 - lon2) * Math.PI / 180;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon1 - lon2) * Math.PI) / 180;
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
@@ -82,7 +86,8 @@ export const sendBookingScheduledNotifications = onDocumentCreated(
         return;
       }
 
-      const agentsSnapshot = await db.collection("agents")
+      const agentsSnapshot = await db
+        .collection("agents")
         .where("services", "array-contains", serviceName)
         .get();
 
@@ -94,8 +99,14 @@ export const sendBookingScheduledNotifications = onDocumentCreated(
         const agentFcmToken = agentData.fcmToken;
 
         if (agentLat != null && agentLng != null && agentFcmToken) {
-          const distance = calculateDistance(userLat, userLng, agentLat, agentLng);
-          if (distance <= 20) { // Within 20km
+          const distance = calculateDistance(
+            userLat,
+            userLng,
+            agentLat,
+            agentLng
+          );
+          if (distance <= 20) {
+            // Within 20km
             notifications.push({
               notification: {
                 title: "New Job Available",
@@ -107,21 +118,73 @@ export const sendBookingScheduledNotifications = onDocumentCreated(
         }
       });
 
-      // Send notifications to agents
+      // Notify CX executives
+      const cxSnapshot = await db.collection("cx_executives").get();
+      cxSnapshot.forEach((cxDoc) => {
+        const cxData = cxDoc.data();
+        const cxFcmToken = cxData.fcmToken;
+        if (cxFcmToken) {
+          notifications.push({
+            notification: {
+              title: "New Booking",
+              body: `New booking for ${booking.serviceName} from ${booking.userName}.`,
+            },
+            token: cxFcmToken,
+          });
+        }
+      });
+
+      // Send notifications to agents and CX
       for (const msg of notifications) {
         try {
           await messaging.send(msg);
-          console.log("Agent notification sent successfully");
+          console.log("Notification sent successfully");
         } catch (error) {
-          console.error("Error sending agent notification:", error);
+          console.error("Error sending notification:", error);
         }
       }
-
     } catch (error) {
       console.error("Error sending notification:", error);
     }
   }
 );
+
+// CX Login function
+export const cxLogin = onCall(async (request) => {
+  const { cxId, password } = request.data;
+
+  if (!cxId || !password) {
+    throw new Error("cxId and password are required");
+  }
+
+  try {
+    const cxDoc = await db.collection("cx_logins").doc(cxId).get();
+    if (!cxDoc.exists) {
+      throw new Error("Invalid CX ID");
+    }
+
+    const cxData = cxDoc.data();
+    if (cxData.password !== password) {
+      throw new Error("Invalid password");
+    }
+
+    // Create custom token for CX
+    const customToken = await getAuth().createCustomToken(cxId);
+
+    // Ensure cx_executives document exists
+    await db.collection("cx_executives").doc(cxId).set(
+      {
+        cxId: cxId,
+        role: "cx",
+      },
+      { merge: true }
+    );
+
+    return { customToken };
+  } catch (error) {
+    throw new Error("Login failed: " + error.message);
+  }
+});
 
 // Trigger on booking update
 export const sendBookingUpdatedNotifications = onDocumentUpdated(
