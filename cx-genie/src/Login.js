@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from './firebase';
+import React, { useState } from "react";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+} from "firebase/auth";
+import { auth } from "./firebase";
 
 function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
   const handleSignIn = async (e) => {
     e.preventDefault();
@@ -31,7 +34,7 @@ function Login() {
       <form>
         <input
           type="email"
-          placeholder="Email"
+          placeholder="Email_"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
