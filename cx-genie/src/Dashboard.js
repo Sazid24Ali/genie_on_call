@@ -17,7 +17,6 @@ function Dashboard() {
   const [agents, setAgents] = useState([]);
   const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
-  const [selectedAgent, setSelectedAgent] = useState(null);
   const [agentBookings, setAgentBookings] = useState([]);
 
   useEffect(() => {
@@ -76,7 +75,6 @@ function Dashboard() {
   };
 
   const viewAgentBookings = async (agentId) => {
-    setSelectedAgent(agentId);
     const q = query(
       collection(db, "bookings"),
       where("assignedAgentId", "==", agentId)

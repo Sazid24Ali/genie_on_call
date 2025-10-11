@@ -26,4 +26,4 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
       - name: Deploy to Firebase
-        run: firebase deploy --only hosting --project genie-on-call-769a1
+        run: firebase deploy --only hosting,functions --project genie-on-call-769a1
