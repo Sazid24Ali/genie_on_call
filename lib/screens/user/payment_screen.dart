@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart'; // For date formatting
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
 
 class PaymentScreen extends StatefulWidget {
   final String serviceName;
@@ -287,6 +288,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ],
         ),
       ),
+      floatingActionButton: const FloatingChatButton(),
     );
   }
 }

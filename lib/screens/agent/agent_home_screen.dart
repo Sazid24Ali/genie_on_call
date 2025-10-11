@@ -10,6 +10,7 @@ import 'agent_profile_screen.dart';
 import 'agent_settings_screen.dart';
 import '../login_screen.dart';
 import 'package:genie_on_call/widgets/app_language_action.dart';
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
 
 // Helper function to map icon strings from Firestore to IconData
 IconData getIconData(String iconName) {
@@ -66,7 +67,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
   String? _agentName;
   String? _agentPhoneNumber;
   List<String> _agentServices = [];
-  int _acceptedJobs = 0;
+  int _scheduledJobs = 0;
   double _earnings = 0.0;
 
   List<int> ranges = [5, 10, 15, 20, 25];
@@ -119,14 +120,14 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
     final user = _auth.currentUser;
     if (user != null) {
       try {
-        // Pending jobs assigned to this agent
-        final pendingQuery = await _firestore
+        // Scheduled jobs assigned to this agent
+        final scheduledQuery = await _firestore
             .collection('bookings')
             .where('agentId', isEqualTo: user.uid)
-            .where('status', isEqualTo: 'Accepted')
+            .where('status', isEqualTo: 'Scheduled')
             .get();
         setState(() {
-          _acceptedJobs = pendingQuery.docs.length;
+          _scheduledJobs = scheduledQuery.docs.length;
         });
 
         // Finished jobs for earnings
@@ -177,27 +178,6 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error getting location: $e')));
-    }
-  }
-
-  Future<void> _acceptBooking(String bookingId) async {
-    try {
-      await _firestore.collection('bookings').doc(bookingId).update({
-        'agentId': _auth.currentUser!.uid,
-        'status': 'Accepted',
-        'acceptedAt': FieldValue.serverTimestamp(),
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Booking accepted!')));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error accepting booking: $e')));
-      }
     }
   }
 
@@ -361,8 +341,9 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) =>
-                              const AgentBookingsScreen(initialTab: 'Accepted'),
+                          builder: (_) => const AgentBookingsScreen(
+                            initialTab: 'Scheduled',
+                          ),
                         ),
                       );
                     },
@@ -382,7 +363,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              '$_acceptedJobs',
+                              '$_scheduledJobs',
                               style: const TextStyle(
                                 fontFamily: 'Montserrat',
                                 fontSize: 24,
@@ -390,7 +371,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                               ),
                             ),
                             Text(
-                              'Accepted Jobs',
+                              'Scheduled Jobs',
                               style: TextStyle(
                                 fontFamily: 'Montserrat',
                                 fontSize: 14,
@@ -616,48 +597,8 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            // Distance Range Selector
-            Row(
-              children: [
-                Text(
-                  'Distance Range: ',
-                  style: TextStyle(
-                    fontFamily: 'Montserrat',
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color:
-                        Theme.of(context).textTheme.bodyLarge?.color ??
-                        Colors.black87,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                DropdownButton<int>(
-                  value: _selectedRange,
-                  items: ranges.map((int range) {
-                    return DropdownMenuItem<int>(
-                      value: range,
-                      child: Text(
-                        '$range km',
-                        style: const TextStyle(
-                          fontFamily: 'Montserrat',
-                          fontSize: 16,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (int? newValue) {
-                    if (newValue != null) {
-                      setState(() {
-                        _selectedRange = newValue;
-                      });
-                    }
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
             Text(
-              'Nearby Jobs',
+              'Scheduled Jobs',
               style: TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 18,
@@ -671,8 +612,8 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
             StreamBuilder<QuerySnapshot>(
               stream: _firestore
                   .collection('bookings')
-                  .where('status', isEqualTo: 'Pending')
-                  .where('agentId', isNull: true)
+                  .where('agentId', isEqualTo: _auth.currentUser!.uid)
+                  .where('status', isEqualTo: 'Scheduled')
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -684,7 +625,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                   return Center(
                     child: Text(
-                      "No nearby jobs available.",
+                      "No scheduled jobs.",
                       style: TextStyle(
                         color:
                             Theme.of(context).textTheme.bodyLarge?.color ??
@@ -695,54 +636,14 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                 }
 
                 final bookings = snapshot.data!.docs;
-                // Updated: substring match for serviceName and distance filter
-                final filteredBookings = bookings.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final serviceName = data['serviceName'] ?? '';
-                  bool serviceMatch = _agentServices.any(
-                    (agentService) => serviceName.contains(agentService),
-                  );
-                  if (!serviceMatch) return false;
-
-                  if (_agentPosition == null) {
-                    return true; // if no location, show all
-                  }
-
-                  final userLat = data['userLat'] as double?;
-                  final userLng = data['userLng'] as double?;
-                  if (userLat == null || userLng == null) return false;
-
-                  final distance =
-                      Geolocator.distanceBetween(
-                        _agentPosition!.latitude,
-                        _agentPosition!.longitude,
-                        userLat,
-                        userLng,
-                      ) /
-                      1000; // in km
-                  return distance <= _selectedRange;
-                }).toList();
-
-                if (filteredBookings.isEmpty) {
-                  return Center(
-                    child: Text(
-                      "No matching jobs.",
-                      style: TextStyle(
-                        color:
-                            Theme.of(context).textTheme.bodyLarge?.color ??
-                            Colors.black87,
-                      ),
-                    ),
-                  );
-                }
 
                 return ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: filteredBookings.length,
+                  itemCount: bookings.length,
                   itemBuilder: (context, index) {
                     final booking =
-                        filteredBookings[index].data() as Map<String, dynamic>;
+                        bookings[index].data() as Map<String, dynamic>;
                     final service = booking['serviceName'] ?? 'Unknown Service';
                     final location =
                         booking['userAddress'] ?? 'Location not available';
@@ -808,7 +709,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Address : $location',
+                              'Address: $location',
                               style: const TextStyle(
                                 fontFamily: 'Montserrat',
                                 fontSize: 14,
@@ -839,28 +740,6 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                                 color: Colors.grey,
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            Align(
-                              alignment: Alignment.bottomRight,
-                              child: ElevatedButton.icon(
-                                onPressed: () =>
-                                    _acceptBooking(filteredBookings[index].id),
-                                icon: const Icon(
-                                  Icons.check,
-                                  color: Colors.white,
-                                ),
-                                label: const Text(
-                                  'Accept',
-                                  style: TextStyle(
-                                    fontFamily: 'Montserrat',
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -872,6 +751,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
           ],
         ),
       ),
+      floatingActionButton: const FloatingChatButton(),
     );
   }
 

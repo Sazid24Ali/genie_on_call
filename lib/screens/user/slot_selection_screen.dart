@@ -11,6 +11,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:genie_on_call/screens/user/booking_confirmation_screen.dart';
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
 
 class SlotSelectionScreen extends StatefulWidget {
   final String serviceName;
@@ -51,6 +52,7 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
   final MapController _mapController = MapController();
 
   bool _isDataLoaded = false;
+  bool _isGeocoding = false;
 
   @override
   void initState() {
@@ -103,61 +105,33 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
       if (userDoc.exists) {
         setState(() {
           _userName = userDoc['name'];
-          _userAddress = userDoc['address'];
           _nameController.text = _userName ?? '';
-          _addressController.text = _userAddress ?? '';
         });
 
-        if (userDoc.data()!.containsKey('latitude') &&
-            userDoc.data()!.containsKey('longitude')) {
-          final double lat = userDoc.data()!['latitude'];
-          final double lon = userDoc.data()!['longitude'];
+        // Use home address and location if available
+        if (userDoc.data()!.containsKey('homeLat') &&
+            userDoc.data()!.containsKey('homeLng') &&
+            userDoc.data()!.containsKey('homeAddress')) {
+          final double lat = userDoc.data()!['homeLat'];
+          final double lon = userDoc.data()!['homeLng'];
+          final String address = userDoc.data()!['homeAddress'];
           setState(() {
-            print("location is $lat $lon");
             _selectedLocation = LatLng(lat, lon);
+            _userAddress = address;
+            _addressController.text = address;
           });
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Future.delayed(const Duration(milliseconds: 100), () {
               _mapController.move(_selectedLocation!, 15.0);
             });
           });
-          if (_userAddress == null || _userAddress!.isEmpty) {
-            try {
-              List<Placemark> placemarks = await placemarkFromCoordinates(
-                lat,
-                lon,
-              );
-              if (placemarks.isNotEmpty) {
-                final Placemark place = placemarks.first;
-                final String address =
-                    [
-                          place.street,
-                          place.subLocality,
-                          place.locality,
-                          place.administrativeArea,
-                          place.postalCode,
-                          place.country,
-                        ]
-                        .where(
-                          (element) => element != null && element.isNotEmpty,
-                        )
-                        .join(', ');
-                setState(() {
-                  _userAddress = address;
-                  _addressController.text = address;
-                });
-                await _firestore.collection('users').doc(_currentUser!.uid).set(
-                  {
-                    'address': address,
-                    'lastUpdated': FieldValue.serverTimestamp(),
-                  },
-                  SetOptions(merge: true),
-                );
-              }
-            } catch (e) {
-              print("Error during reverse geocoding: $e");
-            }
-          }
+        } else {
+          // No home set, leave empty
+          setState(() {
+            _userAddress = '';
+            _addressController.text = '';
+            _selectedLocation = null;
+          });
         }
         setState(() {
           _isDataLoaded = true;
@@ -171,7 +145,27 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
     }
   }
 
+  Future<void> _saveHomeLocation() async {
+    if (_currentUser == null ||
+        _selectedLocation == null ||
+        _userAddress == null)
+      return;
+    try {
+      await _firestore.collection('users').doc(_currentUser!.uid).set({
+        'homeLat': _selectedLocation!.latitude,
+        'homeLng': _selectedLocation!.longitude,
+        'homeAddress': _userAddress,
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print("Error saving home location: $e");
+    }
+  }
+
   Future<void> _getCurrentLocation() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Getting current location...')),
+    );
+
     try {
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied ||
@@ -191,6 +185,13 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
       setState(() {
         _selectedLocation = LatLng(pos.latitude, pos.longitude);
       });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(milliseconds: 100), () {
+          _mapController.move(_selectedLocation!, 15.0);
+        });
+      });
+
+      // Reverse geocode
       try {
         List<Placemark> placemarks = await placemarkFromCoordinates(
           pos.latitude,
@@ -213,15 +214,21 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
             _userAddress = address;
             _addressController.text = address;
           });
+          await _saveHomeLocation();
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Location set as home')));
+        } else {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Address not found')));
         }
       } catch (e) {
         print("Error reverse geocoding current location: $e");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to fetch address')),
+        );
       }
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Future.delayed(const Duration(milliseconds: 100), () {
-          _mapController.move(_selectedLocation!, 15.0);
-        });
-      });
     } catch (e) {
       print("Error getting current location: $e");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -345,7 +352,12 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
   void _onMapTap(TapPosition tapPosition, LatLng position) async {
     setState(() {
       _selectedLocation = position;
+      _isGeocoding = true;
     });
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Fetching address...')));
 
     try {
       List<Placemark> placemarks = await placemarkFromCoordinates(
@@ -365,10 +377,27 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
         setState(() {
           _userAddress = address;
           _addressController.text = address;
+          _isGeocoding = false;
         });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Address updated')));
+      } else {
+        setState(() {
+          _isGeocoding = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Address not found')));
       }
     } catch (e) {
       print("Error during reverse geocoding on map tap: $e");
+      setState(() {
+        _isGeocoding = false;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to fetch address')));
     }
   }
 
@@ -470,9 +499,9 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
     try {
       await _firestore.collection('users').doc(_currentUser!.uid).set({
         'name': _nameController.text,
-        'address': _addressController.text,
-        'latitude': _selectedLocation?.latitude,
-        'longitude': _selectedLocation?.longitude,
+        'homeAddress': _addressController.text,
+        'homeLat': _selectedLocation?.latitude,
+        'homeLng': _selectedLocation?.longitude,
         'phoneNumber': _currentUser!.phoneNumber,
         'description': widget.description,
         'images': widget.images,
@@ -553,37 +582,6 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
               : Colors.black87,
         ),
         elevation: 1,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12.0),
-            child: Builder(
-              builder: (ctx) => IconButton(
-                icon: const Icon(Icons.language),
-                onPressed: () async {
-                  showDialog<bool>(
-                    context: ctx,
-                    builder: (dctx) => AlertDialog(
-                      title: Text(
-                        t('change_language_confirm', 'Confirm language change'),
-                      ),
-                      content: const SizedBox.shrink(),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(dctx, false),
-                          child: Text(t('cancel', 'Cancel')),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(dctx, true),
-                          child: Text(t('confirm', 'Confirm')),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -660,7 +658,7 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
               controller: _addressController,
               decoration: InputDecoration(
                 labelText: 'Service Address',
-                hintText: 'Enter your service address',
+                hintText: 'Address will be set from map selection',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -673,6 +671,7 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
               ),
               style: const TextStyle(fontFamily: 'Montserrat'),
               maxLines: 2,
+              readOnly: true,
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -938,6 +937,7 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
           ],
         ),
       ),
+      floatingActionButton: const FloatingChatButton(),
     );
   }
 }

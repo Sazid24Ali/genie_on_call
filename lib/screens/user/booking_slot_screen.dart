@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 import 'package:genie_on_call/screens/user/slot_selection_screen.dart';
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
 
 class BookingSlotScreen extends StatefulWidget {
   final String serviceName;
@@ -410,6 +411,7 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
           ],
         ),
       ),
+      floatingActionButton: const FloatingChatButton(),
     );
   }
 }

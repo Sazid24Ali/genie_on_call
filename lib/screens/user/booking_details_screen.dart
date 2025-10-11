@@ -11,6 +11,7 @@ import 'package:geolocator/geolocator.dart'; // Import geolocator package
 import 'package:genie_on_call/screens/user/payment_screen.dart'; // Import the new PaymentScreen
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
 
 class BookingDetailsScreen extends StatefulWidget {
   final String serviceName;
@@ -847,6 +848,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
           ],
         ),
       ),
+      floatingActionButton: const FloatingChatButton(),
     );
   }
 }

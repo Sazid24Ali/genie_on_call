@@ -360,12 +360,13 @@ class _UserBookingsScreenState extends State<UserBookingsScreen> {
                   itemCount: sortedBookings.length,
                   itemBuilder: (context, index) {
                     final booking = sortedBookings[index].data();
-                    final Timestamp bookingTimestamp =
-                        booking['bookingDate'] as Timestamp;
-                    final DateTime bookingDateTime = bookingTimestamp.toDate();
-                    final String formattedDate = DateFormat(
-                      'MMM d, yyyy',
-                    ).format(bookingDateTime);
+                    final Timestamp? bookingTimestamp =
+                        booking['bookingDate'] as Timestamp?;
+                    final String formattedDate = bookingTimestamp != null
+                        ? DateFormat(
+                            'MMM d, yyyy',
+                          ).format(bookingTimestamp.toDate())
+                        : 'Invalid Date';
 
                     final String agentId = booking['agentId'] ?? '';
                     final String serviceProviderName =

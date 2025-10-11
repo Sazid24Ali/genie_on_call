@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'otp_screen.dart';
 import 'user/home_screen.dart';
 import 'agent/agent_profile_screen.dart';
@@ -59,8 +60,10 @@ class _LoginScreenState extends State<LoginScreen> {
           "createdAt": FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       } else {
-        // For user, only ask location permission and save location if first time (no lat/lng saved)
-        if (!userDoc.exists || userDoc.data()?['latitude'] == null || userDoc.data()?['longitude'] == null) {
+        // For user, only ask location permission and save home location if first time (no homeLat/lng saved)
+        if (!userDoc.exists ||
+            userDoc.data()?['homeLat'] == null ||
+            userDoc.data()?['homeLng'] == null) {
           LocationPermission permission = await Geolocator.checkPermission();
           if (permission == LocationPermission.denied) {
             permission = await Geolocator.requestPermission();
@@ -80,15 +83,25 @@ class _LoginScreenState extends State<LoginScreen> {
             desiredAccuracy: LocationAccuracy.high,
           );
 
+          // Get address from coordinates
+          List<Placemark> placemarks = await placemarkFromCoordinates(
+            pos.latitude,
+            pos.longitude,
+          );
+          String homeAddress = placemarks.isNotEmpty
+              ? "${placemarks[0].street}, ${placemarks[0].locality}, ${placemarks[0].administrativeArea}"
+              : "Unknown Address";
+
           await _firestore.collection("users").doc(user.uid).set({
             "phone": user.phoneNumber,
             "role": selectedRole,
-            "latitude": pos.latitude,
-            "longitude": pos.longitude,
+            "homeLat": pos.latitude,
+            "homeLng": pos.longitude,
+            "homeAddress": homeAddress,
             "createdAt": FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
         } else {
-          // Location already saved, just update phone and role
+          // Home location already saved, just update phone and role
           await _firestore.collection("users").doc(user.uid).set({
             "phone": user.phoneNumber,
             "role": selectedRole,

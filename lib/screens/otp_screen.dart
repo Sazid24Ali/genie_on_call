@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'role_selection_screen.dart';
 import 'user/home_screen.dart';
 import 'agent/agent_profile_screen.dart';
@@ -63,10 +64,10 @@ class _OTPScreenState extends State<OTPScreen> {
           "createdAt": FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       } else {
-        // For user, only ask location permission and save location if first time (no lat/lng saved)
+        // For user, only ask location permission and save location if first time (no homeAddress saved)
         if (!userDoc.exists ||
-            userDoc.data()?['latitude'] == null ||
-            userDoc.data()?['longitude'] == null) {
+            userDoc.data()?['homeAddress'] == null ||
+            userDoc.data()?['homeAddress'].isEmpty) {
           LocationPermission permission = await Geolocator.checkPermission();
           if (permission == LocationPermission.denied) {
             permission = await Geolocator.requestPermission();
@@ -86,15 +87,38 @@ class _OTPScreenState extends State<OTPScreen> {
             desiredAccuracy: LocationAccuracy.high,
           );
 
+          // Reverse geocode to get address
+          String homeAddress = "Unknown Address";
+          try {
+            List<Placemark> placemarks = await placemarkFromCoordinates(
+              pos.latitude,
+              pos.longitude,
+            );
+            if (placemarks.isNotEmpty) {
+              final Placemark place = placemarks.first;
+              homeAddress = [
+                place.street,
+                place.subLocality,
+                place.locality,
+                place.administrativeArea,
+                place.postalCode,
+                place.country,
+              ].where((element) => element != null && element.isNotEmpty).join(', ');
+            }
+          } catch (e) {
+            print("Error reverse geocoding: $e");
+          }
+
           await _firestore.collection("users").doc(user.uid).set({
             "phone": user.phoneNumber,
             "role": widget.selectedRole,
-            "latitude": pos.latitude,
-            "longitude": pos.longitude,
+            "homeLat": pos.latitude,
+            "homeLng": pos.longitude,
+            "homeAddress": homeAddress,
             "createdAt": FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
         } else {
-          // Location already saved, just update phone and role
+          // Address already saved, just update phone and role
           await _firestore.collection("users").doc(user.uid).set({
             "phone": user.phoneNumber,
             "role": widget.selectedRole,

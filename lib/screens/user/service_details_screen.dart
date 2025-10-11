@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'booking_slot_screen.dart';
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
 
 // Helper to map icon string to IconData (ensure this function is also in home_screen.dart or a common utility file)
 IconData getIconData(String iconName) {
@@ -405,6 +406,7 @@ class ServiceDetailsScreen extends StatelessWidget {
           );
         },
       ),
+      floatingActionButton: const FloatingChatButton(),
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/services.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/app_language_action.dart';
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
 
 const MethodChannel _platform = MethodChannel(
   'com.example.genie_on_call/settings',
@@ -249,6 +250,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
       ),
+      floatingActionButton: const FloatingChatButton(),
     );
   }
 }
