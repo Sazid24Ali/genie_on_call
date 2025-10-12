@@ -8,6 +8,7 @@ import 'settings_screen.dart';
 import 'package:genie_on_call/screens/login_screen.dart'; // Import LoginScreen for logout navigation
 import 'package:genie_on_call/widgets/app_language_action.dart';
 import 'package:genie_on_call/widgets/translated_text.dart';
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
 import 'package:provider/provider.dart';
 import 'package:genie_on_call/providers/locale_provider.dart';
 import 'package:genie_on_call/utils/locale_utils.dart';
@@ -264,6 +265,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      floatingActionButton: const FloatingChatButton(),
       appBar: AppBar(
         title: TranslatedText(
           'app_title',

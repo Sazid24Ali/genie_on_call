@@ -1,0 +1,15 @@
+.hidden {
+  display: none !important;
+}
+
+/* Custom styles for chat messages */
+#chat-messages div {
+  margin-bottom: 10px;
+  padding: 8px;
+  border-radius: 5px;
+  background-color: #e9ecef;
+}
+
+#chat-messages div:nth-child(even) {
+  background-color: #f8f9fa;
+}

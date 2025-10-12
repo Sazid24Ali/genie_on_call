@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
 
 class AgentBookingsScreen extends StatefulWidget {
   const AgentBookingsScreen({super.key, this.initialTab = 'Accepted'});
@@ -406,6 +407,7 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      floatingActionButton: const FloatingChatButton(),
       appBar: AppBar(
         title: Text(
           'My Jobs',

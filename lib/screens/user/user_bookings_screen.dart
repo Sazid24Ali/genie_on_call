@@ -7,6 +7,7 @@ import 'package:genie_on_call/providers/theme_provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
 
 class UserBookingsScreen extends StatefulWidget {
   const UserBookingsScreen({super.key});
@@ -75,6 +76,7 @@ class _UserBookingsScreenState extends State<UserBookingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      floatingActionButton: const FloatingChatButton(),
       appBar: AppBar(
         title: const Text(
           'My Bookings', // Changed title to reflect its new focus

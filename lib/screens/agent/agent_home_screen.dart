@@ -10,6 +10,7 @@ import 'agent_profile_screen.dart';
 import 'agent_settings_screen.dart';
 import '../login_screen.dart';
 import 'package:genie_on_call/widgets/app_language_action.dart';
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
 
 // Helper function to map icon strings from Firestore to IconData
 IconData getIconData(String iconName) {
@@ -329,6 +330,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      floatingActionButton: const FloatingChatButton(),
       appBar: AppBar(
         title: Text(
           'Genie On Call - Agent',
