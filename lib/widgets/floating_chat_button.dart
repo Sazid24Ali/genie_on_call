@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../screens/chat_screen.dart';
+import '../screens/chats_list_screen.dart';
 
 class FloatingChatButton extends StatelessWidget {
   const FloatingChatButton({super.key});
@@ -11,16 +11,9 @@ class FloatingChatButton extends StatelessWidget {
       onPressed: () {
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
-          // Navigate to chat screen with 'genie-support' room for executives
-          // For agents, this can be used for executive communication; adjust room if needed
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => ChatScreen(
-                chatRoomId: 'genie-support',
-                otherUserId: 'executive', // Fixed for genie/executive
-              ),
-            ),
+            MaterialPageRoute(builder: (c) => const ChatsListScreen()),
           );
         }
       },

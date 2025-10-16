@@ -41,8 +41,8 @@ class _UserBookingsScreenState extends State<UserBookingsScreen> {
             .get();
         if (userDoc.exists) {
           setState(() {
-            _userName = userDoc['name']; // Get the name from Firestore
-            _userPhone = userDoc['phone']; // Get the phone from Firestore
+            _userName = userDoc['userName']; // Get the name from Firestore
+            _userPhone = userDoc['userPhone']; // Get the phone from Firestore
           });
         }
       } catch (e) {

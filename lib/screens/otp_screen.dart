@@ -28,7 +28,6 @@ class _OTPScreenState extends State<OTPScreen> {
 
   Future<void> _saveUserData(User user) async {
     try {
-      final userDoc = await _firestore.collection("users").doc(user.uid).get();
       final bool isAgent = widget.selectedRole == 'agent';
 
       // For agent, always require location permission and update location
@@ -63,44 +62,12 @@ class _OTPScreenState extends State<OTPScreen> {
           "createdAt": FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       } else {
-        // For user, only ask location permission and save location if first time (no lat/lng saved)
-        if (!userDoc.exists ||
-            userDoc.data()?['latitude'] == null ||
-            userDoc.data()?['longitude'] == null) {
-          LocationPermission permission = await Geolocator.checkPermission();
-          if (permission == LocationPermission.denied) {
-            permission = await Geolocator.requestPermission();
-            if (permission == LocationPermission.denied ||
-                permission == LocationPermission.deniedForever) {
-              print("Location permissions are denied or denied forever.");
-              await _firestore.collection("users").doc(user.uid).set({
-                "phone": user.phoneNumber,
-                "role": widget.selectedRole,
-                "createdAt": FieldValue.serverTimestamp(),
-              }, SetOptions(merge: true));
-              return;
-            }
-          }
-
-          Position pos = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.high,
-          );
-
-          await _firestore.collection("users").doc(user.uid).set({
-            "phone": user.phoneNumber,
-            "role": widget.selectedRole,
-            "latitude": pos.latitude,
-            "longitude": pos.longitude,
-            "createdAt": FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        } else {
-          // Location already saved, just update phone and role
-          await _firestore.collection("users").doc(user.uid).set({
-            "phone": user.phoneNumber,
-            "role": widget.selectedRole,
-            "createdAt": FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        }
+        // For regular users: do NOT request location during login/OTP flow.
+        await _firestore.collection("users").doc(user.uid).set({
+          "phone": user.phoneNumber,
+          "role": widget.selectedRole,
+          "createdAt": FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
       }
     } catch (e) {
       print("Error saving user data or getting location: $e");

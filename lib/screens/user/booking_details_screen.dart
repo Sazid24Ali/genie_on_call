@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:genie_on_call/utils/coords.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:flutter/services.dart' show rootBundle;
@@ -92,7 +93,6 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   }
 
   Future<void> _fetchUserData() async {
-    print("inside fetch user data");
     if (_currentUser == null) return;
 
     try {
@@ -101,20 +101,19 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
           .doc(_currentUser!.uid)
           .get();
       if (userDoc.exists) {
+        final data = userDoc.data();
         setState(() {
-          _userName = userDoc['name'];
-          _userAddress = userDoc['address'];
+          _userName = data?['name'];
+          _userAddress = data?['address'];
           _nameController.text = _userName ?? '';
           _addressController.text = _userAddress ?? '';
-          print(userDoc['latitude']);
-          print(userDoc['longitude']);
         });
 
-        if (userDoc.data()!.containsKey('latitude') &&
-            userDoc.data()!.containsKey('longitude')) {
-          final double lat = userDoc.data()!['latitude'];
-          final double lon = userDoc.data()!['longitude'];
+        final double? lat = getLat(data);
+        final double? lon = getLng(data);
+        if (lat != null && lon != null) {
           setState(() {
+            if (kDebugMode) print("location is $lat $lon");
             _selectedLocation = LatLng(lat, lon);
           });
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -122,48 +121,45 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
               _mapController.move(_selectedLocation!, 15.0);
             });
           });
+        }
 
-          if (_userAddress == null || _userAddress!.isEmpty) {
-            try {
-              List<Placemark> placemarks = await placemarkFromCoordinates(
-                lat,
-                lon,
-              );
-              if (placemarks.isNotEmpty) {
-                final Placemark place = placemarks.first;
-                final String address =
-                    [
-                          place.street,
-                          place.subLocality,
-                          place.locality,
-                          place.administrativeArea,
-                          place.postalCode,
-                          place.country,
-                        ]
-                        .where(
-                          (element) => element != null && element.isNotEmpty,
-                        )
-                        .join(', ');
-                setState(() {
-                  _userAddress = address;
-                  _addressController.text = address;
-                });
-                await _firestore.collection('users').doc(_currentUser!.uid).set(
-                  {
-                    'address': address,
-                    'lastUpdated': FieldValue.serverTimestamp(),
-                  },
-                  SetOptions(merge: true),
-                );
-              }
-            } catch (e) {
-              print("Error during reverse geocoding: $e");
+        if ((_userAddress == null || _userAddress!.isEmpty) &&
+            lat != null &&
+            lon != null) {
+          try {
+            List<Placemark> placemarks = await placemarkFromCoordinates(
+              lat,
+              lon,
+            );
+            if (placemarks.isNotEmpty) {
+              final place = placemarks.first;
+              final String address =
+                  [
+                        place.street,
+                        place.subLocality,
+                        place.locality,
+                        place.administrativeArea,
+                        place.postalCode,
+                        place.country,
+                      ]
+                      .where((element) => element != null && element.isNotEmpty)
+                      .join(', ');
+              setState(() {
+                _userAddress = address;
+                _addressController.text = address;
+              });
+              await _firestore.collection('users').doc(_currentUser!.uid).set({
+                'address': address,
+                'lastUpdated': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
             }
+          } catch (e) {
+            if (kDebugMode) print("Error during reverse geocoding: $e");
           }
         }
       }
     } catch (e) {
-      print("Error fetching user data: $e");
+      if (kDebugMode) print("Error fetching user data: $e");
     }
   }
 

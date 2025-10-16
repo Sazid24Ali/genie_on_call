@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:genie_on_call/screens/booking_success_screen.dart';
+import 'package:genie_on_call/services/chat_service.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 class BookingConfirmationScreen extends StatefulWidget {
@@ -96,12 +99,140 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
     });
 
     try {
+      // Require location permission and get current position before creating booking
+      double? bookingLat;
+      double? bookingLng;
+      try {
+        LocationPermission permission = await Geolocator.checkPermission();
+
+        // Show rationale dialog if permission hasn't been granted
+        if (permission == LocationPermission.denied ||
+            permission == LocationPermission.deniedForever) {
+          final proceed = await showDialog<bool>(
+            context: context,
+            builder: (dctx) => AlertDialog(
+              title: const Text('Why we need your location'),
+              content: const Text(
+                'We need your location to assign a nearby agent and verify the service address. The app will now request location permission.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dctx).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(dctx).pop(true),
+                  child: const Text('Continue'),
+                ),
+              ],
+            ),
+          );
+          if (proceed != true) {
+            setState(() {
+              _isConfirming = false;
+            });
+            return;
+          }
+          permission = await Geolocator.requestPermission();
+        }
+
+        if (permission == LocationPermission.deniedForever) {
+          final openSettings = await showDialog<bool>(
+            context: context,
+            builder: (dctx) => AlertDialog(
+              title: const Text('Permission Required'),
+              content: const Text(
+                'Location permission is permanently denied. Please open app settings and grant location permission.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dctx).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(dctx).pop(true),
+                  child: const Text('Open Settings'),
+                ),
+              ],
+            ),
+          );
+          if (openSettings == true) await openAppSettings();
+          setState(() {
+            _isConfirming = false;
+          });
+          return;
+        }
+
+        if (permission != LocationPermission.always &&
+            permission != LocationPermission.whileInUse) {
+          if (mounted) {
+            await showDialog<void>(
+              context: context,
+              builder: (dctx) => AlertDialog(
+                title: const Text('Location Required'),
+                content: const Text(
+                  'Location permission is required to complete a booking. Please enable location permission and try again.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dctx).pop(),
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
+            );
+          }
+          setState(() {
+            _isConfirming = false;
+          });
+          return;
+        }
+
+        final pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+        bookingLat = pos.latitude;
+        bookingLng = pos.longitude;
+
+        // Save coordinates to user doc as well
+        await _firestore.collection('users').doc(_currentUser.uid).set({
+          'latitude': bookingLat,
+          'longitude': bookingLng,
+          // Keep legacy booking fields in user doc for compatibility
+          'userLat': bookingLat,
+          'userLng': bookingLng,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        print('Location permission/position error: $e');
+        if (mounted) {
+          await showDialog<void>(
+            context: context,
+            builder: (dctx) => AlertDialog(
+              title: const Text('Location Error'),
+              content: const Text(
+                'Unable to obtain your location. Please enable location services and try again.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dctx).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+        setState(() {
+          _isConfirming = false;
+        });
+        return;
+      }
       // Upload images to Firebase Storage
       List<String> imageUrls = [];
       for (String path in widget.images) {
         String fileName = path.split('/').last;
         Reference ref = FirebaseStorage.instance.ref().child(
-          'bookings/${_currentUser!.uid}/images/$fileName',
+          'bookings/${_currentUser.uid}/images/$fileName',
         );
         await ref.putFile(File(path));
         String url = await ref.getDownloadURL();
@@ -113,17 +244,22 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
       if (widget.recording != null) {
         String fileName = widget.recording!.split('/').last;
         Reference ref = FirebaseStorage.instance.ref().child(
-          'bookings/${_currentUser!.uid}/recordings/$fileName',
+          'bookings/${_currentUser.uid}/recordings/$fileName',
         );
         await ref.putFile(File(widget.recording!));
         recordingUrl = await ref.getDownloadURL();
       }
 
       final bookingRef = await _firestore.collection('bookings').add({
-        'userId': _currentUser!.uid,
+        'userId': _currentUser.uid,
         'userName': widget.name,
         'userPhone': widget.phoneNumber,
         'userAddress': widget.address,
+        'userLat': bookingLat,
+        'userLng': bookingLng,
+        // also set canonical fields for compatibility
+        'latitude': bookingLat,
+        'longitude': bookingLng,
         'serviceName': widget.serviceName,
         'cost': widget.cost,
         'description': widget.description,
@@ -136,10 +272,34 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
       });
 
       // Update user doc if needed
-      await _firestore.collection('users').doc(_currentUser!.uid).update({
+      await _firestore.collection('users').doc(_currentUser.uid).update({
         'lastBookingId': bookingRef.id,
         'lastUpdated': FieldValue.serverTimestamp(),
       });
+
+      // Ensure a chat document exists for this booking so CX/agents can chat.
+      try {
+        // Create ChatService instance and ensure chat exists for this booking
+        final chatService = ChatService();
+        final chatId = await chatService.getOrCreateChat(
+          bookingId: bookingRef.id,
+          userId: _currentUser.uid,
+          cxId: null,
+        );
+
+        // Create/overwrite chat_requests/{chatId} so CX dashboard can pick it up
+        await _firestore.collection('chat_requests').doc(chatId).set({
+          'bookingId': bookingRef.id,
+          'chatId': chatId,
+          'userId': _currentUser.uid,
+          'message': 'User initiated chat for booking',
+          'status': 'new',
+          'timestamp': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        // Non-fatal: log and continue
+        print('Failed to create chat for booking: $e');
+      }
 
       if (mounted) {
         Navigator.pushReplacement(

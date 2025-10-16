@@ -308,8 +308,10 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
                             color: Colors.blue,
                           ),
                           onPressed: () async {
-                            final lat = booking['userLat'];
-                            final lng = booking['userLng'];
+                            final lat =
+                                booking['userLat'] ?? booking['latitude'];
+                            final lng =
+                                booking['userLng'] ?? booking['longitude'];
                             if (lat == null || lng == null) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(

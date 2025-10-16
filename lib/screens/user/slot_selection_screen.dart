@@ -8,8 +8,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:genie_on_call/utils/coords.dart';
 import 'package:genie_on_call/screens/user/booking_confirmation_screen.dart';
 
 class SlotSelectionScreen extends StatefulWidget {
@@ -58,6 +60,7 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
     _fetchUserData();
     _fetchAvailableDates();
     _loadLocalTranslations();
+    _maybeShowMapFabTip();
   }
 
   Locale _appLocale = const Locale('en');
@@ -108,12 +111,12 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
           _addressController.text = _userAddress ?? '';
         });
 
-        if (userDoc.data()!.containsKey('latitude') &&
-            userDoc.data()!.containsKey('longitude')) {
-          final double lat = userDoc.data()!['latitude'];
-          final double lon = userDoc.data()!['longitude'];
+        final data = userDoc.data();
+        final double? lat = getLat(data);
+        final double? lon = getLng(data);
+        if (lat != null && lon != null) {
           setState(() {
-            print("location is $lat $lon");
+            if (kDebugMode) print("location is $lat $lon");
             _selectedLocation = LatLng(lat, lon);
           });
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -150,6 +153,11 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
                   {
                     'address': address,
                     'lastUpdated': FieldValue.serverTimestamp(),
+                    // keep both coordinate representations
+                    'userLat': _selectedLocation?.latitude,
+                    'userLng': _selectedLocation?.longitude,
+                    'latitude': _selectedLocation?.latitude,
+                    'longitude': _selectedLocation?.longitude,
                   },
                   SetOptions(merge: true),
                 );
@@ -222,11 +230,46 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
           _mapController.move(_selectedLocation!, 15.0);
         });
       });
+      // Mark the FAB tip as seen when the user uses the FAB
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('seenMapFabTip', true);
+      } catch (_) {}
     } catch (e) {
       print("Error getting current location: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to get current location')),
       );
+    }
+  }
+
+  Future<void> _maybeShowMapFabTip() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final seen = prefs.getBool('seenMapFabTip') ?? false;
+      if (!seen) {
+        // Delay slightly so scaffold is ready
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Tip: Tap the location button to center the map on your current location.',
+              ),
+              duration: const Duration(seconds: 8),
+              action: SnackBarAction(
+                label: 'Got it',
+                onPressed: () async {
+                  try {
+                    await prefs.setBool('seenMapFabTip', true);
+                  } catch (_) {}
+                },
+              ),
+            ),
+          );
+        });
+      }
+    } catch (e) {
+      // ignore prefs errors
     }
   }
 

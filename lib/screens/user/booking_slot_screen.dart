@@ -8,7 +8,11 @@ import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
 import 'dart:io';
+import 'package:genie_on_call/utils/coords.dart';
 import 'package:genie_on_call/screens/user/slot_selection_screen.dart';
 
 class BookingSlotScreen extends StatefulWidget {
@@ -152,18 +156,194 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
   }
 
   void _navigateToSlotSelection() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => SlotSelectionScreen(
-          serviceName: widget.serviceName,
-          cost: widget.cost,
-          description: _descriptionController.text,
-          images: _pickedImages.map((x) => x.path).toList(),
-          recording: _recordedFilePath,
+    _ensureLocationThenNavigate();
+  }
+
+  Future<void> _ensureLocationThenNavigate() async {
+    // Show rationale and request permission, then fetch position and save to user doc
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+
+      // If not granted, show rationale first
+      // Check whether we've already shown the rationale to this user
+      final user = FirebaseAuth.instance.currentUser;
+      bool seenRationale = false;
+      Map<String, dynamic>? userData;
+      if (user != null) {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        if (doc.exists) {
+          userData = doc.data();
+          seenRationale = (userData?['seenLocationRationale'] == true);
+        }
+      }
+
+      if (!seenRationale) {
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (dctx) => AlertDialog(
+            title: const Text('Why we need your location'),
+            content: const Text(
+              'We use your location to center the map and suggest nearby agents. The app will now request location permission.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dctx).pop(false),
+                child: const Text('Continue without location'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dctx).pop(true),
+                child: const Text('Allow'),
+              ),
+            ],
+          ),
+        );
+        if (proceed != true) {
+          // Navigate without trying to get location
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SlotSelectionScreen(
+                serviceName: widget.serviceName,
+                cost: widget.cost,
+                description: _descriptionController.text,
+                images: _pickedImages.map((x) => x.path).toList(),
+                recording: _recordedFilePath,
+              ),
+            ),
+          );
+          return;
+        }
+
+        // mark that we've shown the rationale so we don't show it again
+        if (user != null) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .set({
+                'seenLocationRationale': true,
+                'lastUpdated': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+        }
+      }
+
+      // If user already has coordinates, skip requesting location
+      if (userData != null) {
+        final double? lat = getLat(userData);
+        final double? lon = getLng(userData);
+        if (lat != null && lon != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SlotSelectionScreen(
+                serviceName: widget.serviceName,
+                cost: widget.cost,
+                description: _descriptionController.text,
+                images: _pickedImages.map((x) => x.path).toList(),
+                recording: _recordedFilePath,
+              ),
+            ),
+          );
+          return;
+        }
+      }
+
+      // otherwise, request permission and try to get current position
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        final openSettings = await showDialog<bool>(
+          context: context,
+          builder: (dctx) => AlertDialog(
+            title: const Text('Permission Required'),
+            content: const Text(
+              'Location permission is permanently denied. Please open app settings and grant location permission.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dctx).pop(true),
+                child: const Text('Open Settings'),
+              ),
+            ],
+          ),
+        );
+        if (openSettings == true) await openAppSettings();
+        // Navigate either way (user can enable and come back), but don't block navigation
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SlotSelectionScreen(
+              serviceName: widget.serviceName,
+              cost: widget.cost,
+              description: _descriptionController.text,
+              images: _pickedImages.map((x) => x.path).toList(),
+              recording: _recordedFilePath,
+            ),
+          ),
+        );
+        return;
+      }
+
+      if (permission == LocationPermission.always ||
+          permission == LocationPermission.whileInUse) {
+        // Try to fetch current position and save to user doc
+        try {
+          final pos = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high,
+          );
+          final user = FirebaseAuth.instance.currentUser;
+          if (user != null) {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .set({
+                  'latitude': pos.latitude,
+                  'longitude': pos.longitude,
+                  'lastUpdated': FieldValue.serverTimestamp(),
+                }, SetOptions(merge: true));
+          }
+        } catch (e) {
+          // ignore position errors, navigate anyway
+        }
+      }
+
+      // Finally, navigate to slot selection
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SlotSelectionScreen(
+            serviceName: widget.serviceName,
+            cost: widget.cost,
+            description: _descriptionController.text,
+            images: _pickedImages.map((x) => x.path).toList(),
+            recording: _recordedFilePath,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      // On any unexpected error, navigate without location
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SlotSelectionScreen(
+            serviceName: widget.serviceName,
+            cost: widget.cost,
+            description: _descriptionController.text,
+            images: _pickedImages.map((x) => x.path).toList(),
+            recording: _recordedFilePath,
+          ),
+        ),
+      );
+    }
   }
 
   @override

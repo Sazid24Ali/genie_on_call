@@ -12,17 +12,19 @@ const db = getFirestore();
 const messaging = getMessaging();
 
 // Function to calculate distance using Haversine formula
-function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Radius of the Earth in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon1 - lon2) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
+// function calculateDistance(lat1, lon1, lat2, lon2) {
+//   const R = 6371; // Radius of the Earth in km
+//   const dLat = ((lat2 - lat1) * Math.PI) / 180;
+//   const dLon = ((lon1 - lon2) * Math.PI) / 180;
+//   const a =
+//     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+//     Math.cos((lat1 * Math.PI) / 180) *
+//       Math.cos((lat2 * Math.PI) / 180) *
+//       Math.sin(dLon / 2) *
+//       Math.sin(dLon / 2);
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
 
 // Trigger on booking creation
 export const sendBookingScheduledNotifications = onDocumentCreated(
@@ -82,7 +84,8 @@ export const sendBookingScheduledNotifications = onDocumentCreated(
         return;
       }
 
-      const agentsSnapshot = await db.collection("agents")
+      const agentsSnapshot = await db
+        .collection("agents")
         .where("services", "array-contains", serviceName)
         .get();
 
@@ -94,8 +97,14 @@ export const sendBookingScheduledNotifications = onDocumentCreated(
         const agentFcmToken = agentData.fcmToken;
 
         if (agentLat != null && agentLng != null && agentFcmToken) {
-          const distance = calculateDistance(userLat, userLng, agentLat, agentLng);
-          if (distance <= 20) { // Within 20km
+          const distance = calculateDistance(
+            userLat,
+            userLng,
+            agentLat,
+            agentLng
+          );
+          if (distance <= 20) {
+            // Within 20km
             notifications.push({
               notification: {
                 title: "New Job Available",
@@ -116,7 +125,6 @@ export const sendBookingScheduledNotifications = onDocumentCreated(
           console.error("Error sending agent notification:", error);
         }
       }
-
     } catch (error) {
       console.error("Error sending notification:", error);
     }
@@ -234,6 +242,57 @@ export const sendBookingUpdatedNotifications = onDocumentUpdated(
       } catch (error) {
         console.error("Error sending agent assignment notification:", error);
       }
+    }
+  }
+);
+
+// Trigger when a chat message is created to update unread counters on parent chat
+export const onChatMessageCreated = onDocumentCreated(
+  "chats/{chatId}/messages/{msgId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const msg = snap.data();
+    const chatId = event.params.chatId;
+    if (!chatId) return;
+
+    try {
+      const chatRef = db.collection("chats").doc(chatId);
+      await db.runTransaction(async (tx) => {
+        const chatDoc = await tx.get(chatRef);
+        const chatData = chatDoc.exists ? chatDoc.data() : {};
+        const senderId = msg?.senderId;
+
+        // Determine existing unread counts
+        const prevCxUnread = (chatData?.cxUnreadCount ?? 0) || 0;
+        const prevUserUnread = (chatData?.userUnreadCount ?? 0) || 0;
+
+        if (!senderId) return;
+
+        // Check if sender is CX by comparing senderId with chat.cxId
+        const isCx = senderId === chatData.cxId;
+
+        if (isCx) {
+          // Message from CX: clear CX unread, increment user unread
+          tx.update(chatRef, {
+            cxUnreadCount: 0,
+            userUnreadCount: prevUserUnread + 1,
+            message: msg.text || "",
+            lastMessageAt: new Date(),
+          });
+        } else {
+          // Message from user: increment CX unread, clear user unread
+          tx.update(chatRef, {
+            cxUnreadCount: prevCxUnread + 1,
+            userUnreadCount: 0,
+            message: msg.text || "",
+            lastMessageAt: new Date(),
+          });
+        }
+      });
+    } catch (error) {
+      console.error("Error updating unread counts for chat message:", error);
     }
   }
 );

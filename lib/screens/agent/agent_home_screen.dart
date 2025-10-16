@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:genie_on_call/utils/coords.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -710,8 +711,8 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                     return true; // if no location, show all
                   }
 
-                  final userLat = data['userLat'] as double?;
-                  final userLng = data['userLng'] as double?;
+                  final double? userLat = getLat(data);
+                  final double? userLng = getLng(data);
                   if (userLat == null || userLng == null) return false;
 
                   final distance =

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart'; // For date formatting
+import 'package:geolocator/geolocator.dart';
+import 'package:flutter/foundation.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class PaymentScreen extends StatefulWidget {
   final String serviceName;
@@ -26,63 +29,171 @@ class PaymentScreen extends StatefulWidget {
 }
 
 class _PaymentScreenState extends State<PaymentScreen> {
-  final User? _currentUser = FirebaseAuth.instance.currentUser;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final User? _currentUser = FirebaseAuth.instance.currentUser;
 
-  Future<void> _finalizeBooking(String paymentMethod) async {
-    if (_currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You must be logged in to book a service.'),
-        ),
-      );
-      return;
-    }
+  double? userLat;
+  double? userLng;
 
+  Future<bool> _ensureLocationAndSave() async {
     try {
-      // 1. Fetch user location
-      final userDoc = await _firestore
-          .collection('users')
-          .doc(_currentUser.uid)
-          .get();
-      double? userLat;
-      double? userLng;
-      if (userDoc.exists) {
-        final data = userDoc.data();
-        userLat = data?['latitude'];
-        userLng = data?['longitude'];
+      LocationPermission permission = await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (dctx) => AlertDialog(
+            title: const Text('Why we need your location'),
+            content: const Text(
+              'We need your location to assign a nearby agent and verify the service address. The app will now request location permission.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dctx).pop(true),
+                child: const Text('Continue'),
+              ),
+            ],
+          ),
+        );
+        if (proceed != true) return false;
+
+        permission = await Geolocator.requestPermission();
       }
 
-      // 2. Update user profile (if any last-minute changes were made, though this is primarily done in BookingSlotScreen)
+      if (permission == LocationPermission.deniedForever) {
+        final openSettings = await showDialog<bool>(
+          context: context,
+          builder: (dctx) => AlertDialog(
+            title: const Text('Permission Required'),
+            content: const Text(
+              'Location permission is permanently denied. Please open app settings and grant location permission.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dctx).pop(true),
+                child: const Text('Open Settings'),
+              ),
+            ],
+          ),
+        );
+        if (openSettings == true) await openAppSettings();
+        return false;
+      }
+
+      if (permission != LocationPermission.always &&
+          permission != LocationPermission.whileInUse) {
+        await showDialog<void>(
+          context: context,
+          builder: (dctx) => AlertDialog(
+            title: const Text('Location Required'),
+            content: const Text(
+              'Location permission is required to complete a booking. Please enable location permission and try again.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dctx).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return false;
+      }
+
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      userLat = pos.latitude;
+      userLng = pos.longitude;
+
+      if (_currentUser != null) {
+        await _firestore.collection('users').doc(_currentUser.uid).set({
+          'latitude': userLat,
+          'longitude': userLng,
+          'userLat': userLat,
+          'userLng': userLng,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      return true;
+    } catch (e) {
+      if (mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (dctx) => AlertDialog(
+            title: const Text('Location Error'),
+            content: const Text(
+              'Unable to obtain your current location. Please make sure location services are enabled and try again.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dctx).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
+  Future<void> _finalizeBooking(String paymentMethod) async {
+    try {
+      // Ensure we have location and saved to user doc
+      final ok = await _ensureLocationAndSave();
+      if (!ok) return;
+
+      if (_currentUser == null) return;
+
+      // Update user profile with last minute changes
       await _firestore.collection('users').doc(_currentUser.uid).set({
         'name': widget.userName,
         'address': widget.userAddress,
         'phoneNumber': _currentUser.phoneNumber,
+        'latitude': userLat,
+        'longitude': userLng,
+        'userLat': userLat,
+        'userLng': userLng,
         'lastUpdated': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      // 3. Create booking
+      // Create booking
       await _firestore.collection('bookings').add({
         'userId': _currentUser.uid,
         'userName': widget.userName,
         'userAddress': widget.userAddress,
         'userLat': userLat,
         'userLng': userLng,
+        'latitude': userLat,
+        'longitude': userLng,
         'userPhone': _currentUser.phoneNumber,
         'serviceName': widget.serviceName,
         'cost': widget.cost,
         'bookingDate': Timestamp.fromDate(widget.selectedDate),
         'bookingTime': widget.selectedTimeSlot,
-        'paymentMethod': paymentMethod, // Store the chosen payment method
-        'status': 'Pending', // Initial status
+        'paymentMethod': paymentMethod,
+        'status': 'Pending',
         'agentId': null,
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Show success message as a pop-up (AlertDialog)
-      showDialog(
+      if (!mounted) return;
+
+      // Show success dialog
+      await showDialog(
         context: context,
-        barrierDismissible: false, // User must tap button to dismiss
+        barrierDismissible: false,
         builder: (BuildContext dialogContext) {
           return AlertDialog(
             title: const Text(
@@ -118,10 +229,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
         },
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to book service: $e')));
-      print("Booking error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to book service: $e')));
+      }
+      if (kDebugMode) print("Booking error: $e");
     }
   }
 
