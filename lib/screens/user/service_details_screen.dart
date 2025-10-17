@@ -65,348 +65,363 @@ class ServiceDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      floatingActionButton: const FloatingChatButton(),
-      appBar: AppBar(
-        title: Text(
-          serviceName,
-          style: TextStyle(
-            fontFamily: 'Montserrat',
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white
-                : Colors.black87,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-        iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white
-              : Colors.black87,
-        ),
-        elevation: 1,
-      ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('services')
-            .where('name', isEqualTo: serviceName)
-            .limit(1)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(
-              child: Text("No sub-services found for this service."),
-            );
-          }
-
-          final serviceDoc = snapshot.data!.docs.first;
-          final subServices = List<Map<String, dynamic>>.from(
-            serviceDoc['subServices'] ?? [],
-          );
-
-          if (subServices.isEmpty) {
-            return const Center(
-              child: Text("No sub-services defined for this service."),
-            );
-          }
-
-          return Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: GridView.builder(
-              itemCount: subServices.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 18,
-                crossAxisSpacing: 18,
-                childAspectRatio: 0.9,
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          // floatingActionButton: const FloatingChatButton(),
+          appBar: AppBar(
+            title: Text(
+              serviceName,
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black87,
+                fontWeight: FontWeight.bold,
               ),
-              itemBuilder: (context, index) {
-                final sub = subServices[index];
-                final subServiceName = sub['name'] ?? 'Unknown Sub-Service';
-                final subServiceIconName = sub['icon'] ?? '';
+            ),
+            backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+            iconTheme: IconThemeData(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : Colors.black87,
+            ),
+            elevation: 1,
+          ),
+          body: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('services')
+                .where('name', isEqualTo: serviceName)
+                .limit(1)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              }
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return const Center(
+                  child: Text("No sub-services found for this service."),
+                );
+              }
 
-                // Retrieve bhkCosts as a List<dynamic>
-                final List<dynamic> bhkCostsArray =
-                    (sub['bhkCosts'] as List<dynamic>?) ?? [];
+              final serviceDoc = snapshot.data!.docs.first;
+              final subServices = List<Map<String, dynamic>>.from(
+                serviceDoc['subServices'] ?? [],
+              );
 
-                // For non-painting services or 'Few Walls Painting', use the direct 'cost' field
-                // For 'Full Home Painting', the cost displayed on the card will be for 1BHK by default
-                final double displayCost =
-                    (subServiceName == 'Full Home Painting' &&
-                        bhkCostsArray.isNotEmpty)
-                    ? getCostFromArrayOfMaps(bhkCostsArray, '1BHK')
-                    : (sub['cost'] as num?)?.toDouble() ?? 0.0;
+              if (subServices.isEmpty) {
+                return const Center(
+                  child: Text("No sub-services defined for this service."),
+                );
+              }
 
-                return GestureDetector(
-                  onTap: () {
-                    // Special handling for Painting
-                    if (serviceName == 'Painting' &&
-                        subServiceName == 'Full Home Painting') {
-                      showDialog(
-                        context: context,
-                        builder: (context) {
-                          return SimpleDialog(
-                            title: const Text(
-                              'Select BHK',
-                              style: TextStyle(
-                                fontFamily: 'Montserrat',
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            children: [
-                              SimpleDialogOption(
-                                child: const Text(
-                                  '1 BHK',
-                                  style: TextStyle(fontFamily: 'Montserrat'),
-                                ),
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => BookingSlotScreen(
-                                        serviceName:
-                                            '$serviceName - $subServiceName (1 BHK)',
-                                        cost: getCostFromArrayOfMaps(
-                                          bhkCostsArray,
-                                          '1BHK',
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              SimpleDialogOption(
-                                child: const Text(
-                                  '2 BHK',
-                                  style: TextStyle(fontFamily: 'Montserrat'),
-                                ),
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => BookingSlotScreen(
-                                        serviceName:
-                                            '$serviceName - $subServiceName (2 BHK)',
-                                        cost: getCostFromArrayOfMaps(
-                                          bhkCostsArray,
-                                          '2BHK',
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              SimpleDialogOption(
-                                child: const Text(
-                                  '3 BHK',
-                                  style: TextStyle(fontFamily: 'Montserrat'),
-                                ),
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => BookingSlotScreen(
-                                        serviceName:
-                                            '$serviceName - $subServiceName (3 BHK)',
-                                        cost: getCostFromArrayOfMaps(
-                                          bhkCostsArray,
-                                          '3BHK',
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                    } else if (serviceName == 'Painting' &&
-                        subServiceName == 'Few Walls Painting') {
-                      showDialog(
-                        context: context,
-                        builder: (context) {
-                          final wallController = TextEditingController();
-                          final double costPerWall =
-                              (sub['cost'] as num?)?.toDouble() ?? 0.0;
+              return Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: GridView.builder(
+                  itemCount: subServices.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 18,
+                    crossAxisSpacing: 18,
+                    childAspectRatio: 0.9,
+                  ),
+                  itemBuilder: (context, index) {
+                    final sub = subServices[index];
+                    final subServiceName = sub['name'] ?? 'Unknown Sub-Service';
+                    final subServiceIconName = sub['icon'] ?? '';
 
-                          return AlertDialog(
-                            title: const Text(
-                              'Enter number of walls',
-                              style: TextStyle(
-                                fontFamily: 'Montserrat',
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            content: TextField(
-                              controller: wallController,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                hintText: 'Number of walls',
-                                hintStyle: TextStyle(fontFamily: 'Montserrat'),
-                              ),
-                              style: const TextStyle(fontFamily: 'Montserrat'),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                },
-                                child: const Text(
-                                  'Cancel',
+                    // Retrieve bhkCosts as a List<dynamic>
+                    final List<dynamic> bhkCostsArray =
+                        (sub['bhkCosts'] as List<dynamic>?) ?? [];
+
+                    // For non-painting services or 'Few Walls Painting', use the direct 'cost' field
+                    // For 'Full Home Painting', the cost displayed on the card will be for 1BHK by default
+                    final double displayCost =
+                        (subServiceName == 'Full Home Painting' &&
+                            bhkCostsArray.isNotEmpty)
+                        ? getCostFromArrayOfMaps(bhkCostsArray, '1BHK')
+                        : (sub['cost'] as num?)?.toDouble() ?? 0.0;
+
+                    return GestureDetector(
+                      onTap: () {
+                        // Special handling for Painting
+                        if (serviceName == 'Painting' &&
+                            subServiceName == 'Full Home Painting') {
+                          showDialog(
+                            context: context,
+                            builder: (context) {
+                              return SimpleDialog(
+                                title: const Text(
+                                  'Select BHK',
                                   style: TextStyle(
                                     fontFamily: 'Montserrat',
-                                    color: Colors.grey,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                              ),
-                              ElevatedButton(
-                                onPressed: () {
-                                  final walls = int.tryParse(
-                                    wallController.text,
-                                  );
-                                  if (walls != null && walls > 0) {
-                                    Navigator.pop(context);
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => BookingSlotScreen(
-                                          serviceName:
-                                              '$serviceName - $subServiceName ($walls walls)',
-                                          cost: costPerWall * walls,
-                                        ),
+                                children: [
+                                  SimpleDialogOption(
+                                    child: const Text(
+                                      '1 BHK',
+                                      style: TextStyle(
+                                        fontFamily: 'Montserrat',
                                       ),
-                                    );
-                                  } else {
-                                    // Replaced SnackBar with AlertDialog
-                                    showDialog(
-                                      context: context,
-                                      builder: (dialogContext) => AlertDialog(
-                                        title: const Text(
-                                          'Invalid Input',
-                                          style: TextStyle(
-                                            fontFamily: 'Montserrat',
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        content: const Text(
-                                          'Please enter a valid number of walls.',
-                                          style: TextStyle(
-                                            fontFamily: 'Montserrat',
-                                          ),
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.of(
-                                              dialogContext,
-                                            ).pop(),
-                                            child: const Text(
-                                              'OK',
-                                              style: TextStyle(
-                                                fontFamily: 'Montserrat',
-                                                color: Colors.blueAccent,
-                                              ),
+                                    ),
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => BookingSlotScreen(
+                                            serviceName:
+                                                '$serviceName - $subServiceName (1 BHK)',
+                                            cost: getCostFromArrayOfMaps(
+                                              bhkCostsArray,
+                                              '1BHK',
                                             ),
                                           ),
-                                        ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  SimpleDialogOption(
+                                    child: const Text(
+                                      '2 BHK',
+                                      style: TextStyle(
+                                        fontFamily: 'Montserrat',
                                       ),
-                                    );
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blueAccent,
-                                ),
-                                child: const Text(
-                                  'Continue',
+                                    ),
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => BookingSlotScreen(
+                                            serviceName:
+                                                '$serviceName - $subServiceName (2 BHK)',
+                                            cost: getCostFromArrayOfMaps(
+                                              bhkCostsArray,
+                                              '2BHK',
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  SimpleDialogOption(
+                                    child: const Text(
+                                      '3 BHK',
+                                      style: TextStyle(
+                                        fontFamily: 'Montserrat',
+                                      ),
+                                    ),
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => BookingSlotScreen(
+                                            serviceName:
+                                                '$serviceName - $subServiceName (3 BHK)',
+                                            cost: getCostFromArrayOfMaps(
+                                              bhkCostsArray,
+                                              '3BHK',
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        } else if (serviceName == 'Painting' &&
+                            subServiceName == 'Few Walls Painting') {
+                          showDialog(
+                            context: context,
+                            builder: (context) {
+                              final wallController = TextEditingController();
+                              final double costPerWall =
+                                  (sub['cost'] as num?)?.toDouble() ?? 0.0;
+
+                              return AlertDialog(
+                                title: const Text(
+                                  'Enter number of walls',
                                   style: TextStyle(
                                     fontFamily: 'Montserrat',
-                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
                                   ),
+                                ),
+                                content: TextField(
+                                  controller: wallController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    hintText: 'Number of walls',
+                                    hintStyle: TextStyle(
+                                      fontFamily: 'Montserrat',
+                                    ),
+                                  ),
+                                  style: const TextStyle(
+                                    fontFamily: 'Montserrat',
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                    },
+                                    child: const Text(
+                                      'Cancel',
+                                      style: TextStyle(
+                                        fontFamily: 'Montserrat',
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      final walls = int.tryParse(
+                                        wallController.text,
+                                      );
+                                      if (walls != null && walls > 0) {
+                                        Navigator.pop(context);
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => BookingSlotScreen(
+                                              serviceName:
+                                                  '$serviceName - $subServiceName ($walls walls)',
+                                              cost: costPerWall * walls,
+                                            ),
+                                          ),
+                                        );
+                                      } else {
+                                        // Replaced SnackBar with AlertDialog
+                                        showDialog(
+                                          context: context,
+                                          builder: (dialogContext) => AlertDialog(
+                                            title: const Text(
+                                              'Invalid Input',
+                                              style: TextStyle(
+                                                fontFamily: 'Montserrat',
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            content: const Text(
+                                              'Please enter a valid number of walls.',
+                                              style: TextStyle(
+                                                fontFamily: 'Montserrat',
+                                              ),
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.of(
+                                                  dialogContext,
+                                                ).pop(),
+                                                child: const Text(
+                                                  'OK',
+                                                  style: TextStyle(
+                                                    fontFamily: 'Montserrat',
+                                                    color: Colors.blueAccent,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.blueAccent,
+                                    ),
+                                    child: const Text(
+                                      'Continue',
+                                      style: TextStyle(
+                                        fontFamily: 'Montserrat',
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        } else {
+                          final double subServiceCost =
+                              (sub['cost'] as num?)?.toDouble() ?? 0.0;
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => BookingSlotScreen(
+                                serviceName: '$serviceName - $subServiceName',
+                                cost: subServiceCost,
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      child: Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        elevation: 4,
+                        shadowColor: Colors.blueAccent.withOpacity(0.1),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: Colors.blueAccent.withOpacity(
+                                  0.08,
+                                ),
+                                radius: 28,
+                                child: Icon(
+                                  getIconData(subServiceIconName),
+                                  size: 32,
+                                  color: Colors.blueAccent,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                subServiceName,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontFamily: 'Montserrat',
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: Colors.black87,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                "₹${displayCost.toStringAsFixed(0)}",
+                                style: const TextStyle(
+                                  fontFamily: 'Montserrat',
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
                                 ),
                               ),
                             ],
-                          );
-                        },
-                      );
-                    } else {
-                      final double subServiceCost =
-                          (sub['cost'] as num?)?.toDouble() ?? 0.0;
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => BookingSlotScreen(
-                            serviceName: '$serviceName - $subServiceName',
-                            cost: subServiceCost,
                           ),
                         ),
-                      );
-                    }
-                  },
-                  child: Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    elevation: 4,
-                    shadowColor: Colors.blueAccent.withOpacity(0.1),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: Colors.blueAccent.withOpacity(
-                              0.08,
-                            ),
-                            radius: 28,
-                            child: Icon(
-                              getIconData(subServiceIconName),
-                              size: 32,
-                              color: Colors.blueAccent,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            subServiceName,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontFamily: 'Montserrat',
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                              color: Colors.black87,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            "₹${displayCost.toStringAsFixed(0)}",
-                            style: const TextStyle(
-                              fontFamily: 'Montserrat',
-                              color: Colors.green,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ],
                       ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          );
-        },
-      ),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+        const FloatingChatButton(),
+      ],
     );
   }
 }

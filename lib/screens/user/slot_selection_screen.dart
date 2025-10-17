@@ -590,412 +590,426 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      floatingActionButton: const FloatingChatButton(),
-      appBar: AppBar(
-        title: Text(
-          t('book_slot', 'Book Your Slot'),
-          style: TextStyle(
-            fontFamily: 'Montserrat',
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white
-                : Colors.black87,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-        iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white
-              : Colors.black87,
-        ),
-        elevation: 1,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12.0),
-            child: Builder(
-              builder: (ctx) => IconButton(
-                icon: const Icon(Icons.language),
-                onPressed: () async {
-                  showDialog<bool>(
-                    context: ctx,
-                    builder: (dctx) => AlertDialog(
-                      title: Text(
-                        t('change_language_confirm', 'Confirm language change'),
-                      ),
-                      content: const SizedBox.shrink(),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(dctx, false),
-                          child: Text(t('cancel', 'Cancel')),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(dctx, true),
-                          child: Text(t('confirm', 'Confirm')),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Service: ${widget.serviceName}',
-                      style: TextStyle(
-                        fontFamily: 'Montserrat',
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white
-                            : Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Cost: ₹${widget.cost.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        fontFamily: 'Montserrat',
-                        fontSize: 16,
-                        color: Colors.green,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Your Details:',
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          // floatingActionButton: const FloatingChatButton(),
+          appBar: AppBar(
+            title: Text(
+              t('book_slot', 'Book Your Slot'),
               style: TextStyle(
                 fontFamily: 'Montserrat',
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
                 color: Theme.of(context).brightness == Brightness.dark
                     ? Colors.white
                     : Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: 'Your Name',
-                hintText: 'Enter your full name',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: const Icon(
-                  Icons.person_rounded,
-                  color: Colors.blueAccent,
-                ),
-                labelStyle: const TextStyle(fontFamily: 'Montserrat'),
-                hintStyle: const TextStyle(fontFamily: 'Montserrat'),
-              ),
-              style: const TextStyle(fontFamily: 'Montserrat'),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _addressController,
-              decoration: InputDecoration(
-                labelText: 'Service Address',
-                hintText: 'Enter your service address',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: const Icon(
-                  Icons.location_on_rounded,
-                  color: Colors.blueAccent,
-                ),
-                labelStyle: const TextStyle(fontFamily: 'Montserrat'),
-                hintStyle: const TextStyle(fontFamily: 'Montserrat'),
-              ),
-              style: const TextStyle(fontFamily: 'Montserrat'),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              initialValue: _currentUser?.phoneNumber ?? '',
-              decoration: InputDecoration(
-                labelText: 'Phone Number',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: const Icon(Icons.phone, color: Colors.blueAccent),
-                labelStyle: const TextStyle(fontFamily: 'Montserrat'),
-              ),
-              readOnly: true,
-              style: const TextStyle(fontFamily: 'Montserrat'),
-            ),
-            const SizedBox(height: 24),
-            if (_isDataLoaded && _selectedLocation != null)
-              SizedBox(
-                height: 200,
-                child: Stack(
-                  children: [
-                    FlutterMap(
-                      mapController: _mapController,
-                      options: MapOptions(
-                        initialCenter: _selectedLocation!,
-                        initialZoom: 15.0,
-                        onTap: _onMapTap,
-                      ),
-                      children: [
-                        TileLayer(
-                          urlTemplate:
-                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName: "com.example.genie_on_call",
-                        ),
-                        MarkerLayer(
-                          markers: _selectedLocation != null
-                              ? [
-                                  Marker(
-                                    point: _selectedLocation!,
-                                    child: const Icon(
-                                      Icons.location_pin,
-                                      color: Colors.red,
-                                      size: 40,
-                                    ),
-                                  ),
-                                ]
-                              : [],
-                        ),
-                      ],
-                    ),
-                    Positioned(
-                      bottom: 16,
-                      right: 16,
-                      child: FloatingActionButton(
-                        onPressed: _getCurrentLocation,
-                        backgroundColor: Colors.blueAccent,
-                        child: const Icon(
-                          Icons.my_location,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              SizedBox(
-                height: 200,
-                child: const Center(child: CircularProgressIndicator()),
-              ),
-            const SizedBox(height: 8),
-            Text(
-              'Latitude: ${_selectedLocation?.latitude?.toStringAsFixed(6) ?? 'N/A'}, Longitude: ${_selectedLocation?.longitude?.toStringAsFixed(6) ?? 'N/A'}',
-              style: TextStyle(
-                fontFamily: 'Montserrat',
-                fontSize: 14,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white70
-                    : Colors.black54,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Select Date:',
-              style: TextStyle(
-                fontFamily: 'Montserrat',
-                fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white
-                    : Colors.black87,
               ),
             ),
-            const SizedBox(height: 12),
-            GestureDetector(
-              onTap: _datesWithAvailableSlots.isEmpty
-                  ? null
-                  : () => _selectDate(context),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 16,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.blueAccent.withOpacity(0.05),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      _selectedDate == null
-                          ? (_datesWithAvailableSlots.isEmpty
-                                ? 'No dates available'
-                                : 'Choose Date')
-                          : DateFormat(
-                              'EEEE, MMM d, yyyy',
-                            ).format(_selectedDate!),
-                      style: TextStyle(
-                        fontFamily: 'Montserrat',
-                        fontSize: 16,
-                        color: _selectedDate == null
-                            ? Colors.grey[600]
-                            : Colors.black87,
-                      ),
-                    ),
-                    Icon(
-                      Icons.calendar_today,
-                      color: _datesWithAvailableSlots.isEmpty
-                          ? Colors.grey
-                          : Colors.blueAccent,
-                    ),
-                  ],
-                ),
-              ),
+            backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+            iconTheme: IconThemeData(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : Colors.black87,
             ),
-            const SizedBox(height: 24),
-            Text(
-              'Select Time Slot:',
-              style: TextStyle(
-                fontFamily: 'Montserrat',
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white
-                    : Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _availableTimeSlotsForSelectedDate.isEmpty
-                ? Center(
-                    child: Text(
-                      _selectedDate == null
-                          ? 'Please select a date first.'
-                          : 'No time slots available for this date.',
-                      style: TextStyle(
-                        fontFamily: 'Montserrat',
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  )
-                : GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          childAspectRatio: 2.5,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                        ),
-                    itemCount: _availableTimeSlotsForSelectedDate.length,
-                    itemBuilder: (context, index) {
-                      final timeSlot =
-                          _availableTimeSlotsForSelectedDate[index];
-                      final isSelected = _selectedTimeSlot == timeSlot;
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedTimeSlot = timeSlot;
-                          });
-                        },
-                        child: Container(
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Colors.blueAccent
-                                : Theme.of(context).brightness ==
-                                      Brightness.dark
-                                ? Theme.of(context).cardColor
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isSelected
-                                  ? Colors.blueAccent
-                                  : Theme.of(context).brightness ==
-                                        Brightness.dark
-                                  ? Colors.grey.withOpacity(0.6)
-                                  : Colors.grey.withOpacity(0.4),
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              if (isSelected)
-                                BoxShadow(
-                                  color: Colors.blueAccent.withOpacity(0.2),
-                                  blurRadius: 6,
-                                  spreadRadius: 1,
-                                ),
-                            ],
-                          ),
-                          child: Text(
-                            timeSlot,
-                            style: TextStyle(
-                              fontFamily: 'Montserrat',
-                              color: isSelected
-                                  ? Colors.white
-                                  : Theme.of(context).brightness ==
-                                        Brightness.dark
-                                  ? Colors.white
-                                  : Colors.black87,
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                              fontSize: 15,
+            elevation: 1,
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 12.0),
+                child: Builder(
+                  builder: (ctx) => IconButton(
+                    icon: const Icon(Icons.language),
+                    onPressed: () async {
+                      showDialog<bool>(
+                        context: ctx,
+                        builder: (dctx) => AlertDialog(
+                          title: Text(
+                            t(
+                              'change_language_confirm',
+                              'Confirm language change',
                             ),
                           ),
+                          content: const SizedBox.shrink(),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dctx, false),
+                              child: Text(t('cancel', 'Cancel')),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(dctx, true),
+                              child: Text(t('confirm', 'Confirm')),
+                            ),
+                          ],
                         ),
                       );
                     },
                   ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _proceedToConfirmation,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueAccent,
+                ),
+              ),
+            ],
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Card(
+                  elevation: 2,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  elevation: 5,
-                ),
-                child: Text(
-                  t('proceed_to_confirmation', 'Proceed to Confirmation'),
-                  style: const TextStyle(
-                    fontFamily: 'Montserrat',
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Service: ${widget.serviceName}',
+                          style: TextStyle(
+                            fontFamily: 'Montserrat',
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Cost: ₹${widget.cost.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontFamily: 'Montserrat',
+                            fontSize: 16,
+                            color: Colors.green,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 24),
+                Text(
+                  'Your Details:',
+                  style: TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Your Name',
+                    hintText: 'Enter your full name',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.person_rounded,
+                      color: Colors.blueAccent,
+                    ),
+                    labelStyle: const TextStyle(fontFamily: 'Montserrat'),
+                    hintStyle: const TextStyle(fontFamily: 'Montserrat'),
+                  ),
+                  style: const TextStyle(fontFamily: 'Montserrat'),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _addressController,
+                  decoration: InputDecoration(
+                    labelText: 'Service Address',
+                    hintText: 'Enter your service address',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.location_on_rounded,
+                      color: Colors.blueAccent,
+                    ),
+                    labelStyle: const TextStyle(fontFamily: 'Montserrat'),
+                    hintStyle: const TextStyle(fontFamily: 'Montserrat'),
+                  ),
+                  style: const TextStyle(fontFamily: 'Montserrat'),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  initialValue: _currentUser?.phoneNumber ?? '',
+                  decoration: InputDecoration(
+                    labelText: 'Phone Number',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.phone,
+                      color: Colors.blueAccent,
+                    ),
+                    labelStyle: const TextStyle(fontFamily: 'Montserrat'),
+                  ),
+                  readOnly: true,
+                  style: const TextStyle(fontFamily: 'Montserrat'),
+                ),
+                const SizedBox(height: 24),
+                if (_isDataLoaded && _selectedLocation != null)
+                  SizedBox(
+                    height: 200,
+                    child: Stack(
+                      children: [
+                        FlutterMap(
+                          mapController: _mapController,
+                          options: MapOptions(
+                            initialCenter: _selectedLocation!,
+                            initialZoom: 15.0,
+                            onTap: _onMapTap,
+                          ),
+                          children: [
+                            TileLayer(
+                              urlTemplate:
+                                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              userAgentPackageName: "com.example.genie_on_call",
+                            ),
+                            MarkerLayer(
+                              markers: _selectedLocation != null
+                                  ? [
+                                      Marker(
+                                        point: _selectedLocation!,
+                                        child: const Icon(
+                                          Icons.location_pin,
+                                          color: Colors.red,
+                                          size: 40,
+                                        ),
+                                      ),
+                                    ]
+                                  : [],
+                            ),
+                          ],
+                        ),
+                        Positioned(
+                          bottom: 16,
+                          right: 16,
+                          child: FloatingActionButton(
+                            onPressed: _getCurrentLocation,
+                            backgroundColor: Colors.blueAccent,
+                            child: const Icon(
+                              Icons.my_location,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  SizedBox(
+                    height: 200,
+                    child: const Center(child: CircularProgressIndicator()),
+                  ),
+                const SizedBox(height: 8),
+                Text(
+                  'Latitude: ${_selectedLocation?.latitude?.toStringAsFixed(6) ?? 'N/A'}, Longitude: ${_selectedLocation?.longitude?.toStringAsFixed(6) ?? 'N/A'}',
+                  style: TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontSize: 14,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white70
+                        : Colors.black54,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Select Date:',
+                  style: TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: _datesWithAvailableSlots.isEmpty
+                      ? null
+                      : () => _selectDate(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.blueAccent.withOpacity(0.3),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.blueAccent.withOpacity(0.05),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _selectedDate == null
+                              ? (_datesWithAvailableSlots.isEmpty
+                                    ? 'No dates available'
+                                    : 'Choose Date')
+                              : DateFormat(
+                                  'EEEE, MMM d, yyyy',
+                                ).format(_selectedDate!),
+                          style: TextStyle(
+                            fontFamily: 'Montserrat',
+                            fontSize: 16,
+                            color: _selectedDate == null
+                                ? Colors.grey[600]
+                                : Colors.black87,
+                          ),
+                        ),
+                        Icon(
+                          Icons.calendar_today,
+                          color: _datesWithAvailableSlots.isEmpty
+                              ? Colors.grey
+                              : Colors.blueAccent,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Select Time Slot:',
+                  style: TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _availableTimeSlotsForSelectedDate.isEmpty
+                    ? Center(
+                        child: Text(
+                          _selectedDate == null
+                              ? 'Please select a date first.'
+                              : 'No time slots available for this date.',
+                          style: TextStyle(
+                            fontFamily: 'Montserrat',
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      )
+                    : GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              childAspectRatio: 2.5,
+                              crossAxisSpacing: 10,
+                              mainAxisSpacing: 10,
+                            ),
+                        itemCount: _availableTimeSlotsForSelectedDate.length,
+                        itemBuilder: (context, index) {
+                          final timeSlot =
+                              _availableTimeSlotsForSelectedDate[index];
+                          final isSelected = _selectedTimeSlot == timeSlot;
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedTimeSlot = timeSlot;
+                              });
+                            },
+                            child: Container(
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.blueAccent
+                                    : Theme.of(context).brightness ==
+                                          Brightness.dark
+                                    ? Theme.of(context).cardColor
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? Colors.blueAccent
+                                      : Theme.of(context).brightness ==
+                                            Brightness.dark
+                                      ? Colors.grey.withOpacity(0.6)
+                                      : Colors.grey.withOpacity(0.4),
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  if (isSelected)
+                                    BoxShadow(
+                                      color: Colors.blueAccent.withOpacity(0.2),
+                                      blurRadius: 6,
+                                      spreadRadius: 1,
+                                    ),
+                                ],
+                              ),
+                              child: Text(
+                                timeSlot,
+                                style: TextStyle(
+                                  fontFamily: 'Montserrat',
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Theme.of(context).brightness ==
+                                            Brightness.dark
+                                      ? Colors.white
+                                      : Colors.black87,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _proceedToConfirmation,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blueAccent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 5,
+                    ),
+                    child: Text(
+                      t('proceed_to_confirmation', 'Proceed to Confirmation'),
+                      style: const TextStyle(
+                        fontFamily: 'Montserrat',
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+        const Positioned(bottom: 16, right: 16, child: FloatingChatButton()),
+      ],
     );
   }
 }

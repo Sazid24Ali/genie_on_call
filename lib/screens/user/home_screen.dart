@@ -9,9 +9,6 @@ import 'package:genie_on_call/screens/login_screen.dart'; // Import LoginScreen 
 import 'package:genie_on_call/widgets/app_language_action.dart';
 import 'package:genie_on_call/widgets/translated_text.dart';
 import 'package:genie_on_call/widgets/floating_chat_button.dart';
-import 'package:provider/provider.dart';
-import 'package:genie_on_call/providers/locale_provider.dart';
-import 'package:genie_on_call/utils/locale_utils.dart';
 import 'package:genie_on_call/screens/chat_screen.dart'; // Import ChatScreen
 import 'package:genie_on_call/screens/chats_list_screen.dart'; // Import ChatsListScreen
 
@@ -296,139 +293,141 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      floatingActionButton: const FloatingChatButton(
-        heroTag: 'home_floating_chat_button',
-      ),
-      appBar: AppBar(
-        title: TranslatedText(
-          'app_title',
-          style: TextStyle(
-            fontFamily: 'Montserrat',
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white
-                : Colors.black87,
-            fontWeight: FontWeight.bold,
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          appBar: AppBar(
+            title: TranslatedText(
+              'app_title',
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black87,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+            iconTheme: IconThemeData(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : Colors.black87,
+            ),
+            elevation: 1,
+            actions: const [AppLanguageAction()],
           ),
-        ),
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-        iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white
-              : Colors.black87,
-        ),
-        elevation: 1,
-        actions: const [AppLanguageAction()],
-      ),
-      drawer: _buildDrawer(context), // Call the drawer builder
-      body: StreamBuilder<QuerySnapshot>(
-        stream: _firestore.collection('services').snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'Error: ${snapshot.error}',
-                style: TextStyle(
-                  color:
-                      Theme.of(context).textTheme.bodyLarge?.color ??
-                      Colors.black87,
-                ),
-              ),
-            );
-          }
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(
-              child: Text(
-                "No services available.",
-                style: TextStyle(
-                  color:
-                      Theme.of(context).textTheme.bodyLarge?.color ??
-                      Colors.black87,
-                ),
-              ),
-            );
-          }
-
-          final services = snapshot.data!.docs;
-
-          return Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: GridView.builder(
-              itemCount: services.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 18,
-                crossAxisSpacing: 18,
-                childAspectRatio: 0.9,
-              ),
-              itemBuilder: (context, index) {
-                final service = services[index].data() as Map<String, dynamic>;
-                final serviceName = service['name'] ?? 'Unknown Service';
-                final serviceIconName = service['icon'] ?? '';
-
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            ServiceDetailsScreen(serviceName: serviceName),
-                      ),
-                    );
-                  },
-                  child: Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    elevation: 4,
-                    shadowColor: Colors.blueAccent.withOpacity(0.1),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: Colors.blueAccent.withOpacity(
-                              0.08,
-                            ),
-                            radius: 28,
-                            child: Icon(
-                              getIconData(serviceIconName),
-                              size: 32,
-                              color: Colors.blueAccent,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            serviceName,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontFamily: 'Montserrat',
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                              color:
-                                  Theme.of(
-                                    context,
-                                  ).textTheme.bodyLarge?.color ??
-                                  Colors.black87,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
+          drawer: _buildDrawer(context), // Call the drawer builder
+          body: StreamBuilder<QuerySnapshot>(
+            stream: _firestore.collection('services').snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text(
+                    'Error: ${snapshot.error}',
+                    style: TextStyle(
+                      color:
+                          Theme.of(context).textTheme.bodyLarge?.color ??
+                          Colors.black87,
                     ),
                   ),
                 );
-              },
-            ),
-          );
-        },
-      ),
+              }
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return Center(
+                  child: Text(
+                    "No services available.",
+                    style: TextStyle(
+                      color:
+                          Theme.of(context).textTheme.bodyLarge?.color ??
+                          Colors.black87,
+                    ),
+                  ),
+                );
+              }
+
+              final services = snapshot.data!.docs;
+
+              return Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: GridView.builder(
+                  itemCount: services.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 18,
+                    crossAxisSpacing: 18,
+                    childAspectRatio: 0.9,
+                  ),
+                  itemBuilder: (context, index) {
+                    final service = services[index].data() as Map<String, dynamic>;
+                    final serviceName = service['name'] ?? 'Unknown Service';
+                    final serviceIconName = service['icon'] ?? '';
+
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ServiceDetailsScreen(serviceName: serviceName),
+                          ),
+                        );
+                      },
+                      child: Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        elevation: 4,
+                        shadowColor: Colors.blueAccent.withOpacity(0.1),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: Colors.blueAccent.withOpacity(
+                                  0.08,
+                                ),
+                                radius: 28,
+                                child: Icon(
+                                  getIconData(serviceIconName),
+                                  size: 32,
+                                  color: Colors.blueAccent,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                serviceName,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontFamily: 'Montserrat',
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color:
+                                      Theme.of(
+                                        context,
+                                      ).textTheme.bodyLarge?.color ??
+                                      Colors.black87,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+        const FloatingChatButton(),
+      ],
     );
   }
 

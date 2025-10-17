@@ -5,10 +5,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 import 'agent_bookings_screen.dart';
 import 'agent_earnings_screen.dart';
 import 'agent_profile_screen.dart';
 import 'agent_settings_screen.dart';
+import '../chats_list_screen.dart';
 import '../login_screen.dart';
 import 'package:genie_on_call/widgets/app_language_action.dart';
 import 'package:genie_on_call/widgets/floating_chat_button.dart';
@@ -203,6 +206,26 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
     }
   }
 
+  Future<void> _finishBooking(String bookingId) async {
+    try {
+      await _firestore.collection('bookings').doc(bookingId).update({
+        'status': 'Finished',
+        'finishedAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Booking marked as finished!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error finishing booking: $e')));
+      }
+    }
+  }
+
   // --- FCM Methods Start ---
   Future<void> _setupFCM() async {
     NotificationSettings settings = await FirebaseMessaging.instance
@@ -355,87 +378,35 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Stats Cards
-            Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              const AgentBookingsScreen(initialTab: 'Accepted'),
-                        ),
-                      );
-                    },
-                    child: Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          children: [
-                            const Icon(
-                              Icons.work,
-                              color: Colors.green,
-                              size: 32,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '$_acceptedJobs',
-                              style: const TextStyle(
-                                fontFamily: 'Montserrat',
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              'Accepted Jobs',
-                              style: TextStyle(
-                                fontFamily: 'Montserrat',
-                                fontSize: 14,
-                                color:
-                                    Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall?.color ??
-                                    Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+            // Earnings Card Only
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AgentEarningsScreen(),
                   ),
+                );
+              },
+              child: Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const AgentEarningsScreen(),
-                        ),
-                      );
-                    },
-                    child: Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.attach_money,
+                        color: Colors.green,
+                        size: 32,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
+                      const SizedBox(width: 16),
+                      Expanded(
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(
-                              Icons.attach_money,
-                              color: Colors.green,
-                              size: 32,
-                            ),
-                            const SizedBox(height: 8),
                             Text(
                               '₹${_earnings.toStringAsFixed(0)}',
                               style: const TextStyle(
@@ -445,7 +416,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                               ),
                             ),
                             Text(
-                              'Earnings',
+                              'Total Earnings',
                               style: TextStyle(
                                 fontFamily: 'Montserrat',
                                 fontSize: 14,
@@ -459,10 +430,10 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                           ],
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
             const SizedBox(height: 24),
             // My Services Expandable Section
@@ -619,48 +590,8 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            // Distance Range Selector
-            Row(
-              children: [
-                Text(
-                  'Distance Range: ',
-                  style: TextStyle(
-                    fontFamily: 'Montserrat',
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color:
-                        Theme.of(context).textTheme.bodyLarge?.color ??
-                        Colors.black87,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                DropdownButton<int>(
-                  value: _selectedRange,
-                  items: ranges.map((int range) {
-                    return DropdownMenuItem<int>(
-                      value: range,
-                      child: Text(
-                        '$range km',
-                        style: const TextStyle(
-                          fontFamily: 'Montserrat',
-                          fontSize: 16,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (int? newValue) {
-                    if (newValue != null) {
-                      setState(() {
-                        _selectedRange = newValue;
-                      });
-                    }
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
             Text(
-              'Nearby Jobs',
+              'Scheduled Jobs',
               style: TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 18,
@@ -674,8 +605,9 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
             StreamBuilder<QuerySnapshot>(
               stream: _firestore
                   .collection('bookings')
-                  .where('status', isEqualTo: 'Pending')
-                  .where('agentId', isNull: true)
+                  .where('agentId', isEqualTo: _auth.currentUser!.uid)
+                  .where('status', isEqualTo: 'Accepted')
+                  .orderBy('createdAt', descending: true)
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -687,7 +619,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                   return Center(
                     child: Text(
-                      "No nearby jobs available.",
+                      "No scheduled jobs.",
                       style: TextStyle(
                         color:
                             Theme.of(context).textTheme.bodyLarge?.color ??
@@ -698,173 +630,341 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                 }
 
                 final bookings = snapshot.data!.docs;
-                // Updated: substring match for serviceName and distance filter
-                final filteredBookings = bookings.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final serviceName = data['serviceName'] ?? '';
-                  bool serviceMatch = _agentServices.any(
-                    (agentService) => serviceName.contains(agentService),
-                  );
-                  if (!serviceMatch) return false;
-
-                  if (_agentPosition == null) {
-                    return true; // if no location, show all
-                  }
-
-                  final double? userLat = getLat(data);
-                  final double? userLng = getLng(data);
-                  if (userLat == null || userLng == null) return false;
-
-                  final distance =
-                      Geolocator.distanceBetween(
-                        _agentPosition!.latitude,
-                        _agentPosition!.longitude,
-                        userLat,
-                        userLng,
-                      ) /
-                      1000; // in km
-                  return distance <= _selectedRange;
-                }).toList();
-
-                if (filteredBookings.isEmpty) {
-                  return Center(
-                    child: Text(
-                      "No matching jobs.",
-                      style: TextStyle(
-                        color:
-                            Theme.of(context).textTheme.bodyLarge?.color ??
-                            Colors.black87,
-                      ),
-                    ),
-                  );
-                }
 
                 return ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: filteredBookings.length,
+                  itemCount: bookings.length,
                   itemBuilder: (context, index) {
                     final booking =
-                        filteredBookings[index].data() as Map<String, dynamic>;
+                        bookings[index].data() as Map<String, dynamic>;
+                    final bookingId = bookings[index].id;
                     final service = booking['serviceName'] ?? 'Unknown Service';
                     final location =
                         booking['userAddress'] ?? 'Location not available';
                     final cost = booking['cost'] ?? 0.0;
+                    // final bookingDate = booking['selectedDate'];
+                    // final String formattedDate;
+                    // if (bookingDate is Timestamp) {
+                    //   final DateTime bookingDateTime = bookingDate.toDate();
+                    //   formattedDate = DateFormat(
+                    //     'MMM d, yyyy',
+                    //   ).format(bookingDateTime);
+                    // } else {
+                    //   formattedDate = 'Date not available';
+                    // }
                     final Timestamp bookingTimestamp =
-                        booking['bookingDate'] as Timestamp;
+                        booking['selectedDate'] as Timestamp;
                     final DateTime bookingDateTime = bookingTimestamp.toDate();
                     final String formattedDate = DateFormat(
                       'MMM d, yyyy',
                     ).format(bookingDateTime);
+
                     final String bookingTime =
-                        booking['bookingTime'] ?? 'Time not specified';
+                        booking['selectedTimeSlot'] ?? 'Time not specified';
                     final String userName = booking['userName'] ?? 'Customer';
                     final String userPhone =
                         booking['userPhone'] ?? 'Not provided';
                     final String description =
                         'Date: $formattedDate\nTime: $bookingTime';
 
-                    return Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 4,
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  getIconData(booking['icon'] ?? ''),
-                                  color: Colors.green,
-                                  size: 24,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    service,
-                                    style: TextStyle(
+                    return InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AgentBookingsScreen(),
+                          ),
+                        );
+                      },
+                      child: Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 4,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    getIconData(booking['icon'] ?? ''),
+                                    color: Colors.green,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      service,
+                                      style: TextStyle(
+                                        fontFamily: 'Montserrat',
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color:
+                                            Theme.of(
+                                              context,
+                                            ).textTheme.bodyLarge?.color ??
+                                            Colors.black87,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '₹${cost.toStringAsFixed(0)}',
+                                    style: const TextStyle(
                                       fontFamily: 'Montserrat',
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
-                                      color:
-                                          Theme.of(
-                                            context,
-                                          ).textTheme.bodyLarge?.color ??
-                                          Colors.black87,
+                                      color: Colors.green,
                                     ),
                                   ),
-                                ),
-                                Text(
-                                  '₹${cost.toStringAsFixed(0)}',
-                                  style: const TextStyle(
-                                    fontFamily: 'Montserrat',
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Address : $location',
-                              style: const TextStyle(
-                                fontFamily: 'Montserrat',
-                                fontSize: 14,
-                                color: Colors.grey,
+                                ],
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              description,
-                              style: TextStyle(
-                                fontFamily: 'Montserrat',
-                                fontSize: 14,
-                                color:
-                                    Theme.of(
-                                      context,
-                                    ).textTheme.bodyLarge?.color ??
-                                    Colors.black87,
-                              ),
-                              maxLines: 4,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Name: $userName, Mobile: $userPhone',
-                              style: const TextStyle(
-                                fontFamily: 'Montserrat',
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Align(
-                              alignment: Alignment.bottomRight,
-                              child: ElevatedButton.icon(
-                                onPressed: () =>
-                                    _acceptBooking(filteredBookings[index].id),
-                                icon: const Icon(
-                                  Icons.check,
-                                  color: Colors.white,
+                              const SizedBox(height: 8),
+                              Text(
+                                description,
+                                style: TextStyle(
+                                  fontFamily: 'Montserrat',
+                                  fontSize: 14,
+                                  color:
+                                      Theme.of(
+                                        context,
+                                      ).textTheme.bodyLarge?.color ??
+                                      Colors.black87,
                                 ),
-                                label: const Text(
-                                  'Accept',
-                                  style: TextStyle(
-                                    fontFamily: 'Montserrat',
-                                    color: Colors.white,
-                                  ),
+                                maxLines: 4,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                booking['description'] ??
+                                    'No description provided',
+                                style: const TextStyle(
+                                  fontFamily: 'Montserrat',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
                                 ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Images: ${(booking['images'] != null && (booking['images'] as List).isNotEmpty) ? (booking['images'] as List).length : 'no'}',
+                                style: const TextStyle(
+                                  fontFamily: 'Montserrat',
+                                  fontSize: 12,
+                                  color: Colors.grey,
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 2),
+                              Text(
+                                'Voice recording: ${booking['recording'] != null ? 'yes' : 'no'}',
+                                style: const TextStyle(
+                                  fontFamily: 'Montserrat',
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Videos: ${(booking['videos'] != null && (booking['videos'] as List).isNotEmpty) ? (booking['videos'] as List).length : 'no'}',
+                                style: const TextStyle(
+                                  fontFamily: 'Montserrat',
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Address : $location',
+                                style: const TextStyle(
+                                  fontFamily: 'Montserrat',
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Name: $userName, Mobile: $userPhone',
+                                style: const TextStyle(
+                                  fontFamily: 'Montserrat',
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Align(
+                                alignment: Alignment.bottomRight,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ElevatedButton.icon(
+                                      onPressed: () =>
+                                          _finishBooking(bookingId),
+                                      icon: const Icon(
+                                        Icons.done,
+                                        color: Colors.white,
+                                      ),
+                                      label: const Text(
+                                        'Mark Finished',
+                                        style: TextStyle(
+                                          fontFamily: 'Montserrat',
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.blue,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.call,
+                                        color: Colors.green,
+                                      ),
+                                      onPressed: () async {
+                                        final phone = booking['userPhone'];
+                                        if (phone != null && phone.isNotEmpty) {
+                                          final String url = 'tel:$phone';
+                                          if (await canLaunch(url)) {
+                                            await launch(url);
+                                          } else {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Could not launch phone dialer',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.directions,
+                                        color: Colors.blue,
+                                      ),
+                                      onPressed: () async {
+                                        final lat =
+                                            booking['userLat'] ??
+                                            booking['latitude'];
+                                        final lng =
+                                            booking['userLng'] ??
+                                            booking['longitude'];
+                                        if (lat == null || lng == null) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Location not available',
+                                              ),
+                                            ),
+                                          );
+                                          return;
+                                        }
+                                        // Get agent's current location
+                                        Position? agentPosition;
+                                        try {
+                                          LocationPermission permission =
+                                              await Geolocator.checkPermission();
+                                          if (permission ==
+                                              LocationPermission.denied) {
+                                            permission =
+                                                await Geolocator.requestPermission();
+                                            if (permission ==
+                                                    LocationPermission.denied ||
+                                                permission ==
+                                                    LocationPermission
+                                                        .deniedForever) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Location permissions are required for navigation',
+                                                  ),
+                                                ),
+                                              );
+                                              return;
+                                            }
+                                          }
+                                          agentPosition =
+                                              await Geolocator.getCurrentPosition(
+                                                desiredAccuracy:
+                                                    LocationAccuracy.high,
+                                              );
+                                        } catch (e) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Error getting current location: $e',
+                                              ),
+                                            ),
+                                          );
+                                          return;
+                                        }
+                                        // ignore: unnecessary_null_comparison
+                                        if (agentPosition == null) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Could not get current location',
+                                              ),
+                                            ),
+                                          );
+                                          return;
+                                        }
+                                        // Try Google Maps navigation intent
+                                        final String mapsUrl =
+                                            'google.navigation:q=$lat,$lng&saddr=${agentPosition.latitude},${agentPosition.longitude}&mode=d';
+                                        final Uri mapsUri = Uri.parse(mapsUrl);
+                                        if (await canLaunchUrl(mapsUri)) {
+                                          await launchUrl(
+                                            mapsUri,
+                                            mode:
+                                                LaunchMode.externalApplication,
+                                          );
+                                        } else {
+                                          // Fallback to web URL
+                                          final String webUrl =
+                                              'https://www.google.com/maps/dir/?api=1&origin=${agentPosition.latitude},${agentPosition.longitude}&destination=$lat,$lng&travelmode=driving';
+                                          final Uri webUri = Uri.parse(webUrl);
+                                          if (await canLaunchUrl(webUri)) {
+                                            await launchUrl(
+                                              webUri,
+                                              mode: LaunchMode
+                                                  .externalApplication,
+                                            );
+                                          } else {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Could not launch maps app',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     );
@@ -943,6 +1043,21 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const AgentBookingsScreen()),
+              );
+            },
+          ),
+
+          ListTile(
+            leading: const Icon(Icons.chat_rounded, color: Colors.green),
+            title: const Text(
+              'Chats',
+              style: TextStyle(fontFamily: 'Montserrat', fontSize: 16),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ChatsListScreen()),
               );
             },
           ),

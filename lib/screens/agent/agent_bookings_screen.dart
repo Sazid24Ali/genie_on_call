@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:video_player/video_player.dart';
 import 'package:genie_on_call/widgets/floating_chat_button.dart';
 
 class AgentBookingsScreen extends StatefulWidget {
@@ -132,12 +133,30 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
     }
   }
 
+  void _showVideoDialog(BuildContext context, String videoUrl) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return Dialog(
+          child: Container(
+            padding: const EdgeInsets.all(16.0),
+            child: VideoPlayerWidget(videoUrl: videoUrl),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildBookingCard(Map<String, dynamic> booking, String bookingId) {
-    final Timestamp bookingTimestamp = booking['bookingDate'] as Timestamp;
-    final DateTime bookingDateTime = bookingTimestamp.toDate();
-    final String formattedDate = DateFormat(
-      'MMM d, yyyy',
-    ).format(bookingDateTime);
+    final bookingDate = booking['selectedDate'];
+    final String formattedDate;
+    if (bookingDate is Timestamp) {
+      final DateTime bookingDateTime = bookingDate.toDate();
+      formattedDate = DateFormat('MMM d, yyyy').format(bookingDateTime);
+    } else {
+      formattedDate = 'Date not available';
+    }
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -158,18 +177,45 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            if (_selectedTab != 'Accepted')
-              _buildDetailRow(
-                Icons.description,
-                'Description',
-                '${booking['description'] ?? 'N/A'}\nDate: $formattedDate\nTime: ${booking['bookingTime'] ?? 'N/A'}',
-              ),
-            const SizedBox(height: 8),
             _buildDetailRow(
-              Icons.payments_rounded,
-              'Payment',
-              booking['paymentMethod'] ?? 'N/A',
+              Icons.description,
+              'Description',
+              '${booking['description'] ?? 'N/A'}\nDate: $formattedDate\nTime: ${booking['selectedTimeSlot'] ?? 'N/A'}',
             ),
+            const SizedBox(height: 4),
+            //  Not required details in my view for now..
+            // Text(
+            //   'Images: ${(booking['images'] != null && (booking['images'] as List).isNotEmpty) ? (booking['images'] as List).length : 'no'}',
+            //   style: const TextStyle(
+            //     fontFamily: 'Montserrat',
+            //     fontSize: 12,
+            //     color: Colors.grey,
+            //   ),
+            // ),
+            // const SizedBox(height: 2),
+            // Text(
+            //   'Voice recording: ${booking['recording'] != null ? 'yes' : 'no'}',
+            //   style: const TextStyle(
+            //     fontFamily: 'Montserrat',
+            //     fontSize: 12,
+            //     color: Colors.grey,
+            //   ),
+            // ),
+            // const SizedBox(height: 2),
+            // Text(
+            //   'Videos: ${(booking['videos'] != null && (booking['videos'] as List).isNotEmpty) ? (booking['videos'] as List).length : 'no'}',
+            //   style: const TextStyle(
+            //     fontFamily: 'Montserrat',
+            //     fontSize: 12,
+            //     color: Colors.grey,
+            //   ),
+            // ),
+            // const SizedBox(height: 8),
+            // _buildDetailRow(
+            //   Icons.payments_rounded,
+            //   'Payment',
+            //   booking['paymentMethod'] ?? 'N/A',
+            // ),
             _buildDetailRow(
               Icons.currency_rupee_rounded,
               'Cost',
@@ -227,13 +273,89 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
                   itemBuilder: (context, index) {
                     return Padding(
                       padding: const EdgeInsets.only(right: 8.0),
-                      child: Image.network(
-                        (booking['images'] as List)[index],
-                        width: 150,
-                        height: 150,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Icon(Icons.error),
+                      child: GestureDetector(
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            barrierDismissible: true,
+                            builder: (BuildContext context) {
+                              return Dialog(
+                                child: InteractiveViewer(
+                                  minScale: 0.5,
+                                  maxScale: 4.0,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Image.network(
+                                      (booking['images'] as List)[index],
+                                      fit: BoxFit.contain,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              const Icon(
+                                                Icons.error,
+                                                size: 100,
+                                              ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                        child: Image.network(
+                          (booking['images'] as List)[index],
+                          width: 150,
+                          height: 150,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(Icons.error),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+            if (booking['videos'] != null &&
+                (booking['videos'] as List).isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Videos:',
+                style: TextStyle(
+                  fontFamily: 'Montserrat',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 150,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: (booking['videos'] as List).length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: GestureDetector(
+                        onTap: () {
+                          _showVideoDialog(
+                            context,
+                            (booking['videos'] as List)[index],
+                          );
+                        },
+                        child: Container(
+                          width: 150,
+                          height: 150,
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.play_circle_fill,
+                            color: Colors.white,
+                            size: 50,
+                          ),
+                        ),
                       ),
                     );
                   },
@@ -405,155 +527,163 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
     );
   }
 
+
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      floatingActionButton: const FloatingChatButton(),
-      appBar: AppBar(
-        title: Text(
-          'My Jobs',
-          style: TextStyle(
-            fontFamily: 'Montserrat',
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white
-                : Colors.black87,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-        iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white
-              : Colors.black87,
-        ),
-        elevation: 1,
-      ),
-      body: Column(
-        children: [
-          // Tab selector
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ChoiceChip(
-                  label: const Text(
-                    'Accepted',
-                    style: TextStyle(fontFamily: 'Montserrat'),
-                  ),
-                  selected: _selectedTab == 'Accepted',
-                  selectedColor: Colors.greenAccent.shade700,
-                  onSelected: (selected) {
-                    if (selected) {
-                      setState(() {
-                        _selectedTab = 'Accepted';
-                      });
-                    }
-                  },
-                  labelStyle: TextStyle(
-                    color: _selectedTab == 'Accepted'
-                        ? Colors.white
-                        : Colors.black87,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  backgroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(
-                      color: _selectedTab == 'Accepted'
-                          ? Colors.green
-                          : Colors.grey.shade300,
-                    ),
-                  ),
-                ),
-                ChoiceChip(
-                  label: const Text(
-                    'Finished',
-                    style: TextStyle(fontFamily: 'Montserrat'),
-                  ),
-                  selected: _selectedTab == 'Finished',
-                  selectedColor: Colors.greenAccent.shade700,
-                  onSelected: (selected) {
-                    if (selected) {
-                      setState(() {
-                        _selectedTab = 'Finished';
-                      });
-                    }
-                  },
-                  labelStyle: TextStyle(
-                    color: _selectedTab == 'Finished'
-                        ? Colors.white
-                        : Colors.black87,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  backgroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(
-                      color: _selectedTab == 'Finished'
-                          ? Colors.green
-                          : Colors.grey.shade300,
-                    ),
-                  ),
-                ),
-              ],
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          appBar: AppBar(
+            title: Text(
+              'My Jobs',
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black87,
+                fontWeight: FontWeight.bold,
+              ),
             ),
+            backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+            iconTheme: IconThemeData(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : Colors.black87,
+            ),
+            elevation: 1,
           ),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: _fetchBookingsStream(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      'Error loading bookings: ${snapshot.error}',
-                      style: const TextStyle(
-                        fontFamily: 'Montserrat',
-                        color: Colors.red,
+          body: Column(
+            children: [
+              // Tab selector
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ChoiceChip(
+                      label: const Text(
+                        'Accepted',
+                        style: TextStyle(fontFamily: 'Montserrat'),
                       ),
-                    ),
-                  );
-                }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Text(
-                        _selectedTab == 'Accepted'
-                            ? 'No accepted jobs.'
-                            : 'No finished jobs.',
-                        style: TextStyle(
-                          fontFamily: 'Montserrat',
-                          fontSize: 16,
-                          color:
-                              Theme.of(context).textTheme.bodyLarge?.color ??
-                              Colors.black87,
+                      selected: _selectedTab == 'Accepted',
+                      selectedColor: Colors.greenAccent.shade700,
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() {
+                            _selectedTab = 'Accepted';
+                          });
+                        }
+                      },
+                      labelStyle: TextStyle(
+                        color: _selectedTab == 'Accepted'
+                            ? Colors.white
+                            : Colors.black87,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      backgroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(
+                          color: _selectedTab == 'Accepted'
+                              ? Colors.green
+                              : Colors.grey.shade300,
                         ),
                       ),
                     ),
-                  );
-                }
+                    ChoiceChip(
+                      label: const Text(
+                        'Finished',
+                        style: TextStyle(fontFamily: 'Montserrat'),
+                      ),
+                      selected: _selectedTab == 'Finished',
+                      selectedColor: Colors.greenAccent.shade700,
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() {
+                            _selectedTab = 'Finished';
+                          });
+                        }
+                      },
+                      labelStyle: TextStyle(
+                        color: _selectedTab == 'Finished'
+                            ? Colors.white
+                            : Colors.black87,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      backgroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(
+                          color: _selectedTab == 'Finished'
+                              ? Colors.green
+                              : Colors.grey.shade300,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: _fetchBookingsStream(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Text(
+                          'Error loading bookings: ${snapshot.error}',
+                          style: const TextStyle(
+                            fontFamily: 'Montserrat',
+                            color: Colors.red,
+                          ),
+                        ),
+                      );
+                    }
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Text(
+                            _selectedTab == 'Accepted'
+                                ? 'No accepted jobs.'
+                                : 'No finished jobs.',
+                            style: TextStyle(
+                              fontFamily: 'Montserrat',
+                              fontSize: 16,
+                              color:
+                                  Theme.of(
+                                    context,
+                                  ).textTheme.bodyLarge?.color ??
+                                  Colors.black87,
+                            ),
+                          ),
+                        ),
+                      );
+                    }
 
-                List<QueryDocumentSnapshot<Map<String, dynamic>>> bookings =
-                    snapshot.data!.docs;
+                    List<QueryDocumentSnapshot<Map<String, dynamic>>> bookings =
+                        snapshot.data!.docs;
 
-                return ListView.builder(
-                  itemCount: bookings.length,
-                  itemBuilder: (context, index) {
-                    final booking = bookings[index].data();
-                    final bookingId = bookings[index].id;
-                    return _buildBookingCard(booking, bookingId);
+                    return ListView.builder(
+                      itemCount: bookings.length,
+                      itemBuilder: (context, index) {
+                        final booking = bookings[index].data();
+                        final bookingId = bookings[index].id;
+                        return _buildBookingCard(booking, bookingId);
+                      },
+                    );
                   },
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+        const FloatingChatButton(),
+      ],
     );
   }
 
@@ -602,5 +732,46 @@ class _AgentBookingsScreenState extends State<AgentBookingsScreen> {
         ],
       ),
     );
+  }
+}
+
+class VideoPlayerWidget extends StatefulWidget {
+  final String videoUrl;
+
+  const VideoPlayerWidget({super.key, required this.videoUrl});
+
+  @override
+  State<VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
+}
+
+class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
+  late VideoPlayerController _controller;
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
+      ..initialize().then((_) {
+        setState(() {
+          _isInitialized = true;
+        });
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _isInitialized
+        ? AspectRatio(
+            aspectRatio: _controller.value.aspectRatio,
+            child: VideoPlayer(_controller),
+          )
+        : const Center(child: CircularProgressIndicator());
   }
 }
