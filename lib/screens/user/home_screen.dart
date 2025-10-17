@@ -12,6 +12,7 @@ import 'package:genie_on_call/widgets/floating_chat_button.dart';
 import 'package:provider/provider.dart';
 import 'package:genie_on_call/providers/locale_provider.dart';
 import 'package:genie_on_call/utils/locale_utils.dart';
+import 'package:genie_on_call/screens/chat_screen.dart'; // Import ChatScreen
 
 // Helper function to map icon strings from Firestore to IconData
 IconData getIconData(String iconName) {
@@ -195,6 +196,12 @@ class _HomeScreenState extends State<HomeScreen> {
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       print('A new onMessageOpenedApp event was published!');
       print('Message data: ${message.data}');
+      // Handle navigation to chat if it's a chat message
+      if (message.data['type'] == 'chat_message' &&
+          message.data['chatId'] != null) {
+        final chatId = message.data['chatId'];
+        _navigateToChat(chatId);
+      }
       // You can navigate to a specific screen here based on the notification data
       // For example:
       // if (message.data['screen'] == 'bookings') {
@@ -213,6 +220,33 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
   // --- FCM Methods End ---
+
+  Future<void> _navigateToChat(String chatId) async {
+    try {
+      final chatDoc = await _firestore.collection('chats').doc(chatId).get();
+      if (chatDoc.exists) {
+        final chatData = chatDoc.data()!;
+        final currentUserId = _auth.currentUser!.uid;
+        final userId = chatData['userId'];
+        final cxId = chatData['cxId'];
+        final otherUserId = currentUserId == userId ? cxId : userId;
+
+        if (otherUserId != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ChatScreen(
+                chatRoomId: chatId,
+                otherUserId: otherUserId,
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error navigating to chat: $e');
+    }
+  }
 
   void _showLogoutConfirmationDialog() {
     showDialog(

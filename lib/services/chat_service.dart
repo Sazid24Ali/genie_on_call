@@ -21,11 +21,12 @@ class ChatService {
 
     // No need to fetch cxId here; server functions will manage unread counters.
 
-    // Add the message
-    await chatRef.collection('messages').add({
+    // Add the message with initial status 'sent'
+    final messageRef = await chatRef.collection('messages').add({
       'text': text,
       'senderId': senderId,
       'timestamp': FieldValue.serverTimestamp(),
+      'status': 'sent',
     });
 
     // Update last-message fields on the chat doc for UI display (server function
@@ -39,6 +40,9 @@ class ChatService {
     } catch (e) {
       // best effort only; ignore errors
     }
+
+    // Mark as delivered when the other user opens the chat (this will be handled in ChatScreen)
+    // For now, we set initial status to 'sent'
   }
 
   /// Find existing chat for [bookingId] or create a new chat document and return its id.
@@ -234,11 +238,12 @@ class ChatService {
       await chatRef.set({'status': 'requested'}, SetOptions(merge: true));
     }
 
-    // Add the initial message to the messages subcollection
+    // Add the initial message to the messages subcollection with status
     await chatRef.collection('messages').add({
       'text': initialMessage,
       'senderId': userId,
       'timestamp': FieldValue.serverTimestamp(),
+      'status': 'sent',
     });
 
     // Set last message and timestamp; do NOT touch unread counters here because
@@ -251,5 +256,32 @@ class ChatService {
     } catch (e) {
       // ignore
     }
+  }
+
+  /// Update message status (e.g., mark as delivered or read)
+  Future<void> updateMessageStatus(String chatRoomId, String messageId, String status) async {
+    await _firestore
+        .collection('chats')
+        .doc(chatRoomId)
+        .collection('messages')
+        .doc(messageId)
+        .update({'status': status});
+  }
+
+  /// Mark all messages in a chat as read for a specific user
+  Future<void> markMessagesAsRead(String chatRoomId, String userId) async {
+    final messages = await _firestore
+        .collection('chats')
+        .doc(chatRoomId)
+        .collection('messages')
+        .where('senderId', isNotEqualTo: userId)
+        .where('status', isNotEqualTo: 'read')
+        .get();
+
+    final batch = _firestore.batch();
+    for (final doc in messages.docs) {
+      batch.update(doc.reference, {'status': 'read'});
+    }
+    await batch.commit();
   }
 }

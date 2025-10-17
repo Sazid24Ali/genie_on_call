@@ -11,21 +11,6 @@ initializeApp();
 const db = getFirestore();
 const messaging = getMessaging();
 
-// Function to calculate distance using Haversine formula
-// function calculateDistance(lat1, lon1, lat2, lon2) {
-//   const R = 6371; // Radius of the Earth in km
-//   const dLat = ((lat2 - lat1) * Math.PI) / 180;
-//   const dLon = ((lon1 - lon2) * Math.PI) / 180;
-//   const a =
-//     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-//     Math.cos((lat1 * Math.PI) / 180) *
-//       Math.cos((lat2 * Math.PI) / 180) *
-//       Math.sin(dLon / 2) *
-//       Math.sin(dLon / 2);
-//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-//   return R * c;
-// }
-
 // Trigger on booking creation
 export const sendBookingScheduledNotifications = onDocumentCreated(
   "bookings/{bookingId}",
@@ -73,64 +58,11 @@ export const sendBookingScheduledNotifications = onDocumentCreated(
 
       await messaging.send(message);
       console.log("User notification sent successfully");
-
-      // Now notify matching agents
-      const serviceName = booking.serviceName;
-      const userLat = booking.userLat;
-      const userLng = booking.userLng;
-
-      if (!serviceName || userLat == null || userLng == null) {
-        console.log("Missing service or location data for agent notifications");
-        return;
-      }
-
-      const agentsSnapshot = await db
-        .collection("agents")
-        .where("services", "array-contains", serviceName)
-        .get();
-
-      const notifications = [];
-      agentsSnapshot.forEach((agentDoc) => {
-        const agentData = agentDoc.data();
-        const agentLat = agentData.location?.lat;
-        const agentLng = agentData.location?.lng;
-        const agentFcmToken = agentData.fcmToken;
-
-        if (agentLat != null && agentLng != null && agentFcmToken) {
-          const distance = calculateDistance(
-            userLat,
-            userLng,
-            agentLat,
-            agentLng
-          );
-          if (distance <= 20) {
-            // Within 20km
-            notifications.push({
-              notification: {
-                title: "New Job Available",
-                body: `A new job for ${serviceName} is available in your area.`,
-              },
-              token: agentFcmToken,
-            });
-          }
-        }
-      });
-
-      // Send notifications to agents
-      for (const msg of notifications) {
-        try {
-          await messaging.send(msg);
-          console.log("Agent notification sent successfully");
-        } catch (error) {
-          console.error("Error sending agent notification:", error);
-        }
-      }
     } catch (error) {
-      console.error("Error sending notification:", error);
+      console.error("Error sending user notification:", error);
     }
   }
 );
-
 // Trigger on booking update
 export const sendBookingUpdatedNotifications = onDocumentUpdated(
   "bookings/{bookingId}",
@@ -242,6 +174,71 @@ export const sendBookingUpdatedNotifications = onDocumentUpdated(
       } catch (error) {
         console.error("Error sending agent assignment notification:", error);
       }
+    }
+  }
+);
+
+// Function to send chat notification to user when CX sends a message
+export const sendChatNotificationToUser = onDocumentCreated(
+  "chats/{chatId}/messages/{msgId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const msg = snap.data();
+    const chatId = event.params.chatId;
+    if (!chatId) return;
+
+    try {
+      const senderId = msg?.senderId;
+      if (!senderId) return;
+
+      // Only send notification if sender is CX
+      const chatDoc = await db.collection("chats").doc(chatId).get();
+      const chatData = chatDoc.exists ? chatDoc.data() : {};
+      const isCx = senderId === chatData.cxId;
+      if (!isCx) return;
+
+      const recipientId = chatData.userId;
+      const senderName = "Customer Support";
+
+      if (recipientId) {
+        // Get recipient's FCM token
+        const recipientDoc = await db
+          .collection("users")
+          .doc(recipientId)
+          .get();
+        if (recipientDoc.exists) {
+          const fcmToken = recipientDoc.data().fcmToken;
+          if (fcmToken) {
+            const messageText = msg.text || "New message";
+            const truncatedText =
+              messageText.length > 50
+                ? messageText.substring(0, 50) + "..."
+                : messageText;
+
+            const notificationMessage = {
+              notification: {
+                title: `New message from ${senderName}`,
+                body: truncatedText,
+              },
+              data: {
+                chatId: chatId,
+                senderId: senderId,
+                type: "chat_message",
+              },
+              token: fcmToken,
+            };
+
+            await messaging.send(notificationMessage);
+            console.log("Chat notification sent to user successfully");
+          } else {
+            console.log("No FCM token for user");
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error sending chat notification to user:", error);
     }
   }
 );

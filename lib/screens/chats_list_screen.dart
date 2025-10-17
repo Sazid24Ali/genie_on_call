@@ -101,7 +101,7 @@ class _ChatsListScreenState extends State<ChatsListScreen>
             final d = filteredDocs[index].data() as Map<String, dynamic>;
             final chatId = filteredDocs[index].id;
             final isClosed = d['status'] == 'closed';
-            print(d);
+            // print(d);
             final title =
                 d['serviceName'] ??
                 (d['bookingId'] != null

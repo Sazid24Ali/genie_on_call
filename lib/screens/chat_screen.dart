@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:intl/intl.dart';
 import '../services/chat_service.dart';
 
 class _VideoPlayerWidget extends StatefulWidget {
@@ -66,7 +67,7 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
   }
 
   void _openInWebView() {
-    print('Debug: Opening video in webview, URL: ${widget.url}');
+    // print('Debug: Opening video in webview, URL: ${widget.url}');
     final webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..loadHtmlString('''
@@ -200,17 +201,31 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   final ChatService _chatService = ChatService();
   String _title = 'Chat';
   Map<String, dynamic>? _bookingData;
   bool _isClosed = false;
   bool _isCx = false;
   String? _chatCxId;
+  bool _isSearching = false;
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    // Mark messages as read when opening the chat
+    _markMessagesAsRead();
+  }
+
+  Future<void> _markMessagesAsRead() async {
+    try {
+      final currentUserId = FirebaseAuth.instance.currentUser!.uid;
+      await _chatService.markMessagesAsRead(widget.chatRoomId, currentUserId);
+    } catch (e) {
+      // Ignore errors for now
+    }
   }
 
   Future<void> _pickMedia() async {
@@ -338,12 +353,58 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _toggleSearch() {
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) {
+        _searchController.clear();
+        _searchQuery = '';
+      }
+    });
+  }
+
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query.toLowerCase();
+    });
+  }
+
+  Widget _buildSearchTextField() {
+    return TextField(
+      controller: _searchController,
+      autofocus: true,
+      decoration: InputDecoration(
+        hintText: 'Search messages...',
+        border: InputBorder.none,
+        suffixIcon: IconButton(
+          icon: const Icon(Icons.clear),
+          onPressed: () {
+            _searchController.clear();
+            _onSearchChanged('');
+          },
+        ),
+      ),
+      onChanged: _onSearchChanged,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_title),
+        title: _isSearching ? _buildSearchTextField() : Text(_title),
+        leading: _isSearching
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _toggleSearch,
+              )
+            : null,
         actions: [
+          if (!_isSearching)
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: _toggleSearch,
+            ),
           if (!_isClosed &&
               _isCx) // Only show close button if not closed and user is CX
             IconButton(
@@ -473,13 +534,22 @@ class _ChatScreenState extends State<ChatScreen> {
                     // For simplicity, since ListView.builder doesn't have a controller, we can reverse the list and scroll to top
                   }
                 });
+                // Filter messages based on search query
+                final filteredMessages = _searchQuery.isEmpty
+                    ? messages
+                    : messages.where((doc) {
+                        final message = doc.data() as Map<String, dynamic>;
+                        final text = message['text'] as String;
+                        return text.toLowerCase().contains(_searchQuery);
+                      }).toList();
+
                 return ListView.builder(
                   reverse: true, // Reverse the list to show latest at bottom
-                  itemCount: messages.length,
+                  itemCount: filteredMessages.length,
                   itemBuilder: (context, index) {
                     final message =
-                        messages[messages.length - 1 - index].data()
-                            as Map<String, dynamic>; // Adjust index for reverse
+                        filteredMessages[filteredMessages.length - 1 - index]
+                            .data() as Map<String, dynamic>; // Adjust index for reverse
                     final isMe =
                         message['senderId'] ==
                         FirebaseAuth.instance.currentUser!.uid;
@@ -500,6 +570,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
                     Widget messageWidget;
                     final text = message['text'] as String;
+                    final isHighlighted = _searchQuery.isNotEmpty &&
+                        text.toLowerCase().contains(_searchQuery);
+
                     if (text.startsWith('Media: ')) {
                       final url = text.substring(7);
                       final isImage =
@@ -514,6 +587,9 @@ class _ChatScreenState extends State<ChatScreen> {
                           decoration: BoxDecoration(
                             color: bubbleColor,
                             borderRadius: BorderRadius.circular(8),
+                            border: isHighlighted
+                                ? Border.all(color: Colors.yellow, width: 2)
+                                : null,
                           ),
                           child: GestureDetector(
                             onTap: () async {
@@ -590,6 +666,9 @@ class _ChatScreenState extends State<ChatScreen> {
                             decoration: BoxDecoration(
                               color: bubbleColor,
                               borderRadius: BorderRadius.circular(8),
+                              border: isHighlighted
+                                  ? Border.all(color: Colors.yellow, width: 2)
+                                  : null,
                             ),
                             child: _VideoPlayerWidget(url: url),
                           );
@@ -600,6 +679,9 @@ class _ChatScreenState extends State<ChatScreen> {
                             decoration: BoxDecoration(
                               color: bubbleColor,
                               borderRadius: BorderRadius.circular(8),
+                              border: isHighlighted
+                                  ? Border.all(color: Colors.yellow, width: 2)
+                                  : null,
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -677,6 +759,9 @@ class _ChatScreenState extends State<ChatScreen> {
                         decoration: BoxDecoration(
                           color: bubbleColor,
                           borderRadius: BorderRadius.circular(8),
+                          border: isHighlighted
+                              ? Border.all(color: Colors.yellow, width: 2)
+                              : null,
                         ),
                         child: Text(
                           text,
@@ -685,12 +770,71 @@ class _ChatScreenState extends State<ChatScreen> {
                       );
                     }
 
+                    final timestamp = message['timestamp'] as Timestamp?;
+                    final formattedTime = timestamp != null
+                        ? DateFormat('hh:mm a').format(timestamp.toDate())
+                        : '';
+
+                    // Get message status
+                    final messageStatus =
+                        message['status'] as String? ?? 'sent';
+                    String statusIcon = '';
+                    Color statusColor = Colors.grey;
+                    if (isMe) {
+                      switch (messageStatus) {
+                        case 'sent':
+                          statusIcon = '✓';
+                          statusColor = Colors.grey;
+                          break;
+                        case 'delivered':
+                          statusIcon = '✓✓';
+                          statusColor = Colors.grey;
+                          break;
+                        case 'read':
+                          statusIcon = '✓✓';
+                          statusColor = Colors.blue;
+                          break;
+                      }
+                    }
+
                     return ListTile(
                       title: Align(
                         alignment: isMe
                             ? Alignment.centerRight
                             : Alignment.centerLeft,
-                        child: messageWidget,
+                        child: Column(
+                          crossAxisAlignment: isMe
+                              ? CrossAxisAlignment.end
+                              : CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(child: messageWidget),
+                                if (isMe && statusIcon.isNotEmpty) ...[
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    statusIcon,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: statusColor,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              formattedTime,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: _isClosed
+                                    ? Colors.grey.shade500
+                                    : Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },

@@ -16,6 +16,12 @@ import {
   where,
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -31,6 +37,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 let currentUser = null;
 let agents = [];
@@ -462,15 +469,17 @@ async function displayChatItems(chats, containerId, showAccept = false) {
     const itemId = `chat-item-${chat.id}`;
     let col = existingItems[itemId];
     const userInfo = userDetails[chat.userId] || {};
-    const displayName =
-      userInfo.name || userInfo.displayName || chat.userName || "Guest User";
+    const displayName = userInfo.name || chat.userName || "Guest User";
     const phone = userInfo.phone || "N/A";
     // Use cxUnreadCount for CX users
-    const unreadCount = (chat.cxUnreadCount ?? 0) || 0;
+    const unreadCount = chat.cxUnreadCount;
     let hasUnread = unreadCount > 0;
     const isAccepted = chat.status === "accepted";
     const isClosed = chat.status === "closed";
     const statusBadge = isClosed ? "Closed" : isAccepted ? "Active" : "Pending";
+
+    // Don't show unread for closed chats
+    hasUnread = hasUnread && !isClosed;
 
     if (col) {
       // Update existing item
@@ -481,18 +490,21 @@ async function displayChatItems(chats, containerId, showAccept = false) {
         if (hasUnread) {
           if (!existingBadge) {
             existingBadge = document.createElement("span");
-            existingBadge.className = "badge bg-danger ms-2";
+            existingBadge.className =
+              "badge bg-danger rounded-pill position-absolute";
             existingBadge.style.fontWeight = "600";
-            existingBadge.style.fontSize = "0.85rem";
-            const nameRow = card.querySelector("div div");
-            if (nameRow) nameRow.appendChild(existingBadge);
+            existingBadge.style.fontSize = "0.75rem";
+            existingBadge.style.padding = "0.25em 0.5em";
+            existingBadge.style.top = "10px";
+            existingBadge.style.right = "10px";
+            card.appendChild(existingBadge);
           }
           existingBadge.textContent = String(unreadCount);
         } else {
           if (existingBadge) existingBadge.remove();
         }
         // Update subtitle
-        const subtitleDiv = card.querySelector("div div:nth-child(2)");
+        const subtitleDiv = card.querySelector("div div:nth-child(3)");
         if (subtitleDiv)
           subtitleDiv.textContent = chat.message || "Chat in progress";
         // Update status badge
@@ -515,6 +527,7 @@ async function displayChatItems(chats, containerId, showAccept = false) {
 
       const card = document.createElement("div");
       card.className = "card h-100 shadow-sm";
+      card.style.position = "relative";
 
       const cardBody = document.createElement("div");
       cardBody.className = "card-body d-flex flex-column";
@@ -536,19 +549,23 @@ async function displayChatItems(chats, containerId, showAccept = false) {
         }</small></div>
       `;
 
+      // Position unread badge at the top right of the card
+      if (hasUnread) {
+        const unreadBadge = document.createElement("span");
+        unreadBadge.className =
+          "badge bg-danger rounded-pill position-absolute";
+        unreadBadge.textContent = String(unreadCount);
+        unreadBadge.style.fontWeight = "600";
+        unreadBadge.style.fontSize = "0.75rem";
+        unreadBadge.style.padding = "0.25em 0.5em";
+        unreadBadge.style.top = "10px";
+        unreadBadge.style.right = "10px";
+        card.appendChild(unreadBadge);
+      }
+
       const right = document.createElement("div");
       right.className =
         "d-flex align-items-center justify-content-between mt-2";
-
-      // Unread badge (if any) - show next to the display name
-      let unreadBadge = null;
-      if (hasUnread) {
-        unreadBadge = document.createElement("span");
-        unreadBadge.className = "badge bg-danger";
-        unreadBadge.textContent = String(unreadCount);
-        unreadBadge.style.fontWeight = "600";
-        unreadBadge.style.fontSize = "0.85rem";
-      }
 
       const badge = document.createElement("span");
       // style the status badge according to acceptance status
@@ -568,6 +585,21 @@ async function displayChatItems(chats, containerId, showAccept = false) {
       openBtn.textContent = "Open";
       openBtn.addEventListener("click", (e) => {
         e.stopPropagation();
+        // If container is minimized, maximize it first
+        const chatTabsContent = document.getElementById("chat-tabs-content");
+        if (chatTabsContent.style.display === "none") {
+          const openChatsContainer = document.getElementById(
+            "open-chats-container"
+          );
+          const minimizeBtn = document.getElementById("minimize-chat-btn");
+          const maximizeBtn = document.getElementById("maximize-chat-btn");
+          const closeBtn = document.getElementById("close-chat-container-btn");
+          chatTabsContent.style.display = "block";
+          openChatsContainer.style.height = "60vh";
+          minimizeBtn.style.display = "inline-block";
+          maximizeBtn.style.display = "none";
+          closeBtn.disabled = false;
+        }
         openChat(chat.id, chat.userId, userInfo);
       });
 
@@ -581,6 +613,7 @@ async function displayChatItems(chats, containerId, showAccept = false) {
             status: "accepted",
             cxId: currentUser.cxId,
             acceptedAt: serverTimestamp(),
+            cxUnreadCount: 0,
           });
           openChat(chat.id, chat.userId, userInfo);
         } catch (err) {
@@ -601,6 +634,8 @@ async function displayChatItems(chats, containerId, showAccept = false) {
             status: "closed",
             closedAt: serverTimestamp(),
             closedBy: currentUser.cxId,
+            cxUnreadCount: 0,
+            userUnreadCount: 0,
           });
           console.log("Chat closed:", chat.id);
         } catch (error) {
@@ -609,15 +644,10 @@ async function displayChatItems(chats, containerId, showAccept = false) {
         }
       });
 
-      // append status badge and unread on the right; append unread next to name on the left
-      right.appendChild(badge);
-      if (unreadBadge) {
-        const nameRow = left.querySelector("div");
-        if (nameRow) nameRow.appendChild(unreadBadge);
-      }
       buttonsDiv.appendChild(openBtn);
       if (showAccept && !isAccepted) buttonsDiv.appendChild(acceptBtn);
       if (isAccepted) buttonsDiv.appendChild(closeBtn);
+      right.appendChild(badge);
       right.appendChild(buttonsDiv);
 
       cardBody.appendChild(left);
@@ -911,16 +941,27 @@ async function openChat(chatId, userId, userInfo = {}) {
 
   // Fetch chat status
   let chatStatus = "requested"; // default
+  let chatData = {};
   try {
     const chatDoc = await getDoc(doc(db, "chats", chatId));
     if (chatDoc.exists()) {
-      chatStatus = chatDoc.data().status || "requested";
+      chatData = chatDoc.data();
+      chatStatus = chatData.status || "requested";
     }
   } catch (error) {
     console.error("Error fetching chat status:", error);
   }
 
   const isAccepted = chatStatus === "accepted";
+
+  // Add unread badge if any
+  // const unreadCount = chatData.cxUnreadCount || 0;
+  // let unreadBadgeHtml = "";
+  // if (unreadCount > 0) {
+  //   unreadBadgeHtml = `<span class="badge bg-danger rounded-pill ms-2" style="font-weight: 600; font-size: 0.75rem; padding: 0.25em 0.5em;">${unreadCount}</span>`;
+  // }
+  // const titleWithBadge = `${title}${unreadBadgeHtml}`;
+  const titleWithBadge = `${title}`;
 
   // Create new tab
   const chatTabs = document.getElementById("chat-tabs");
@@ -937,7 +978,7 @@ async function openChat(chatId, userId, userInfo = {}) {
   tabBtn.setAttribute("data-bs-target", `#chat-content-${chatId}`);
   tabBtn.type = "button";
   tabBtn.role = "tab";
-  tabBtn.innerHTML = `${title} <span class="ms-2 text-muted" style="cursor: pointer;" onclick="closeChatTab('${chatId}')">&times;</span>`;
+  tabBtn.innerHTML = `${titleWithBadge} <span class="ms-2 text-muted" style="cursor: pointer;" onclick="closeChatTab('${chatId}')">&times;</span>`;
   tabLi.appendChild(tabBtn);
   chatTabs.appendChild(tabLi);
 
@@ -957,6 +998,10 @@ async function openChat(chatId, userId, userInfo = {}) {
       </div>
   <div id="chat-messages-${chatId}" style="height: calc(60vh - 140px); overflow-y: auto; padding: 20px; box-sizing: border-box; background-color: #ffffffff; padding-bottom: 90px;"></div>
       <div class="d-flex gap-2 p-2 border-top" style="position: absolute; bottom: 0; left: 0; right: 0; background-color: #e9ecef; z-index: 10;">
+        <input type="file" id="file-input-${chatId}" class="form-control" accept="image/*" style="display: none;" ${
+    sendDisabled ? "disabled" : ""
+  }>
+        <button id="upload-btn-${chatId}" class="btn btn-outline-secondary" ${sendDisabled}>📎</button>
         <input type="text" id="chat-input-${chatId}" class="form-control" placeholder="Type a message..." ${
     sendDisabled ? "disabled" : ""
   }>
@@ -1006,6 +1051,8 @@ async function openChat(chatId, userId, userInfo = {}) {
   const sendBtn = document.getElementById(`send-btn-${chatId}`);
   const closeChatBtn = document.getElementById(`close-chat-btn-${chatId}`);
   const acceptChatBtn = document.getElementById(`accept-chat-btn-${chatId}`);
+  const uploadBtn = document.getElementById(`upload-btn-${chatId}`);
+  const fileInput = document.getElementById(`file-input-${chatId}`);
 
   if (acceptChatBtn) {
     acceptChatBtn.addEventListener("click", async () => {
@@ -1015,9 +1062,11 @@ async function openChat(chatId, userId, userInfo = {}) {
           cxId: currentUser.cxId,
           acceptedAt: serverTimestamp(),
         });
-        // Enable input and send button
+        // Enable input, send button, upload button, and file input
         chatInput.disabled = false;
         sendBtn.disabled = false;
+        uploadBtn.disabled = false;
+        fileInput.disabled = false;
         // Remove accept button
         acceptChatBtn.remove();
         console.log("Chat accepted:", chatId);
@@ -1028,12 +1077,43 @@ async function openChat(chatId, userId, userInfo = {}) {
     });
   }
 
+  // Set up file upload
+  uploadBtn.addEventListener("click", () => {
+    fileInput.click();
+  });
+
+  fileInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Upload to Firebase Storage
+      const storageRef = ref(
+        storage,
+        `chat_attachments/${chatId}/${file.name}`
+      );
+      try {
+        const snapshot = await uploadBytes(storageRef, file);
+        const downloadURL = await getDownloadURL(snapshot.ref);
+        // Send message with the URL
+        await addDoc(collection(db, "chats", chatId, "messages"), {
+          text: `Media: ${downloadURL}`,
+          senderId: currentUser.cxId,
+          timestamp: serverTimestamp(),
+        });
+        // Clear the input
+        fileInput.value = "";
+      } catch (error) {
+        console.error("Error uploading file:", error);
+        alert("Error uploading file: " + error.message);
+      }
+    }
+  });
+
   // Listen to messages
   const messagesQuery = query(
     collection(db, "chats", chatId, "messages"),
     orderBy("timestamp", "asc")
   );
-  const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+  const unsubscribe = onSnapshot(messagesQuery, async (snapshot) => {
     chatMessages.innerHTML = "";
     snapshot.docs.forEach((doc) => {
       const msg = doc.data();
@@ -1042,22 +1122,33 @@ async function openChat(chatId, userId, userInfo = {}) {
         msg.senderId === currentUser.cxId ? "text-end" : "text-start";
 
       let messageContent;
-      if (msg.text.startsWith('Media: ')) {
+      if (msg.text.startsWith("Media: ")) {
         const url = msg.text.substring(7);
         const isImage = url.match(/\.(jpg|jpeg|png|gif|webp)$/i);
         if (isImage) {
-          messageContent = `<strong>${
+          messageContent = `${
             msg.senderId === currentUser.cxId ? "CX" : displayName
-          }:</strong><br><img src="${url}" alt="Attachment" style="max-width: 200px; max-height: 200px; cursor: pointer; border-radius: 8px;" onclick="window.open('${url}', '_blank')">`;
+          }:<br><img src="${url}" alt="Attachment" style="max-width: 200px; max-height: 200px; cursor: pointer; border-radius: 8px;" onclick="window.open('${url}', '_blank')">`;
         } else {
-          messageContent = `<strong>${
+          messageContent = `${
             msg.senderId === currentUser.cxId ? "CX" : displayName
-          }:</strong><br><div style="display: inline-block; padding: 8px; background-color: #f8f9fa; border-radius: 8px; margin-top: 4px;"><strong>Attachment</strong><br><a href="${url}" target="_blank" style="color: #007bff; text-decoration: underline;">View Media</a></div>`;
+          }:<br><div style="display: inline-block; padding: 8px; background-color: #f8f9fa; border-radius: 8px; margin-top: 4px;"><strong>Attachment</strong><br><a href="${url}" target="_blank" style="color: #007bff; text-decoration: underline;">View Media</a></div>`;
         }
       } else {
-        messageContent = `<strong>${
+        messageContent = `${
           msg.senderId === currentUser.cxId ? "CX" : displayName
-        }:</strong> ${msg.text}`;
+        }:<strong> ${msg.text}</strong>`;
+      }
+
+      // Add timestamp under the message
+      const timestamp = msg.timestamp
+        ? new Date(msg.timestamp.toDate()).toLocaleString()
+        : "N/A";
+      messageContent += `<br><small class="text-muted">${timestamp}</small>`;
+
+      // Add status for CX messages
+      if (msg.senderId === currentUser.cxId) {
+        messageContent += ` <small class="text-muted">Sent</small>`;
       }
 
       msgDiv.innerHTML = messageContent;
@@ -1076,6 +1167,20 @@ async function openChat(chatId, userId, userInfo = {}) {
       requestAnimationFrame(scrollToBottom);
       setTimeout(scrollToBottom, 50);
     });
+
+    // Only clear unread count if this chat tab is currently active/visible
+    // Removed this because the because the unread badge in title will help the cx to remember that he has to reply to them.
+    // Uncomment the below lines so that you can enable this feature.
+    // const activeTab = document.querySelector("#chat-tabs .nav-link.active");
+    // if (activeTab && activeTab.id === `chat-tab-${chatId}`) {
+    //   try {
+    //     await updateDoc(doc(db, "chats", chatId), {
+    //       cxUnreadCount: 0,
+    //     });
+    //   } catch (error) {
+    //     console.error("Error clearing unread count:", error);
+    //   }
+    // }
   });
 
   sendBtn.addEventListener("click", async () => {
@@ -1526,14 +1631,13 @@ window.deleteSlots = async (date) => {
 window.closeChatTab = async (chatId) => {
   if (!confirm("Are you sure you want to close this chat tab?")) return;
 
+  // Reset unread count when closing the tab (CX has "read" by closing)
   // try {
   //   await updateDoc(doc(db, "chats", chatId), {
-  //     status: "closed",
-  //     closedAt: serverTimestamp(),
-  //     closedBy: currentUser.cxId,
+  //     cxUnreadCount: 0,
   //   });
   // } catch (error) {
-  //   console.error("Error closing chat:", error);
+  //   console.error("Error resetting unread count:", error);
   // }
 
   // Remove tab and content
@@ -1569,6 +1673,7 @@ function setupChatContainerControls() {
   controlsDiv.className =
     "chat-controls d-flex justify-content-end p-2 bg-light border-bottom";
   controlsDiv.innerHTML = `
+    <button id="close-chat-container-btn" class="btn btn-sm btn-outline-danger me-1">Close</button>
     <button id="minimize-chat-btn" class="btn btn-sm btn-outline-secondary me-1">Minimize</button>
     <button id="maximize-chat-btn" class="btn btn-sm btn-outline-secondary" style="display:none;">Maximize</button>
   `;
@@ -1576,9 +1681,29 @@ function setupChatContainerControls() {
   // Insert at the top of the container
   openChatsContainer.insertBefore(controlsDiv, openChatsContainer.firstChild);
 
-  // Add event listeners for minimize/maximize
+  // Add event listeners
+  const closeBtn = document.getElementById("close-chat-container-btn");
   const minimizeBtn = document.getElementById("minimize-chat-btn");
   const maximizeBtn = document.getElementById("maximize-chat-btn");
+
+  closeBtn.addEventListener("click", () => {
+    // Close all open chat tabs and hide the container
+    const chatTabs = document.getElementById("chat-tabs");
+    const chatTabsContent = document.getElementById("chat-tabs-content");
+
+    // Remove all tabs
+    while (chatTabs.firstChild) {
+      chatTabs.removeChild(chatTabs.firstChild);
+    }
+
+    // Remove all tab content
+    while (chatTabsContent.firstChild) {
+      chatTabsContent.removeChild(chatTabsContent.firstChild);
+    }
+
+    // Hide the container
+    openChatsContainer.style.display = "none";
+  });
 
   minimizeBtn.addEventListener("click", () => {
     // Minimize: hide the content, show only tabs or a small bar
@@ -1588,6 +1713,8 @@ function setupChatContainerControls() {
     maximizeBtn.style.display = "inline-block";
     // Set minimized height
     openChatsContainer.style.height = "50px";
+    // Disable close button when minimized
+    closeBtn.disabled = true;
   });
 
   maximizeBtn.addEventListener("click", () => {
@@ -1597,6 +1724,8 @@ function setupChatContainerControls() {
     minimizeBtn.style.display = "inline-block";
     maximizeBtn.style.display = "none";
     // Set maximized height
-    openChatsContainer.style.height = "600px";
+    openChatsContainer.style.height = "60vh";
+    // Enable close button when maximized
+    closeBtn.disabled = false;
   });
 }

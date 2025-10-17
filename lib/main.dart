@@ -20,15 +20,32 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
+  print('Handling a background message: ${message.messageId}');
 }
 
-void initializeLocalNotification() {
+void initializeLocalNotification() async {
   const AndroidInitializationSettings androidSettings =
       AndroidInitializationSettings('@mipmap/ic_launcher');
+
+  const AndroidNotificationChannel channel = AndroidNotificationChannel(
+    'high_importance_channel',
+    'High Importance Notifications',
+    description: 'This channel is used for important notifications.',
+    importance: Importance.max,
+    showBadge: true,
+    enableVibration: true,
+    enableLights: true,
+  );
+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(channel);
+
   const InitializationSettings initSettings = InitializationSettings(
     android: androidSettings,
   );
-  flutterLocalNotificationsPlugin.initialize(initSettings);
+  await flutterLocalNotificationsPlugin.initialize(initSettings);
 }
 
 Future<void> _setupFCM() async {
@@ -40,20 +57,42 @@ Future<void> _setupFCM() async {
     );
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      print('User granted permission');
+
+      // Get the FCM token
+      String? token = await FirebaseMessaging.instance.getToken();
+      print("FCM Token: $token");
+
+      // Save token to Firestore if user is logged in
+      final user = FirebaseAuth.instance.currentUser;
+      if (token != null && user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'fcmToken': token,
+          'lastTokenUpdate': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        print("FCM Token saved to Firestore for user: ${user.uid}");
+      }
+
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        final notification = message.notification;
-        final android = message.notification?.android;
-        if (notification != null && android != null) {
+        print('Got a message whilst in the foreground!');
+        print('Message data: ${message.data}');
+
+        if (message.notification != null) {
+          print(
+            'Message also contained a notification: ${message.notification!.title} - ${message.notification!.body}',
+          );
+          // Display a local notification
           flutterLocalNotificationsPlugin.show(
-            notification.hashCode,
-            notification.title,
-            notification.body,
-            NotificationDetails(
+            message.hashCode,
+            message.notification!.title,
+            message.notification!.body,
+            const NotificationDetails(
               android: AndroidNotificationDetails(
                 'high_importance_channel',
                 'High Importance Notifications',
                 importance: Importance.max,
                 priority: Priority.high,
+                showWhen: true,
               ),
             ),
           );
@@ -61,12 +100,18 @@ Future<void> _setupFCM() async {
       });
 
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        if (message.notification != null)
-          debugPrint(message.notification.toString());
+        print('A new onMessageOpenedApp event was published!');
+        print('Message data: ${message.data}');
+        // Handle navigation to chat if it's a chat message
+        if (message.data['type'] == 'chat_message' && message.data['chatId'] != null) {
+          // Navigation will be handled by individual screens
+        }
       });
+    } else {
+      print('User declined or has not accepted permission');
     }
   } catch (e) {
-    debugPrint('FCM setup failed: $e');
+    print('FCM setup failed: $e');
   }
 }
 
@@ -115,8 +160,6 @@ class _MyAppState extends State<MyApp> {
           locale: localeProvider.locale,
           supportedLocales: const [
             Locale('en'),
-            Locale('hi'),
-            Locale('te'),
             Locale.fromSubtags(languageCode: 'hi', scriptCode: 'Latn'),
             Locale.fromSubtags(languageCode: 'te', scriptCode: 'Latn'),
           ],
