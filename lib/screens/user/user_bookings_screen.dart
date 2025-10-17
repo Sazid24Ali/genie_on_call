@@ -41,8 +41,8 @@ class _UserBookingsScreenState extends State<UserBookingsScreen> {
             .get();
         if (userDoc.exists) {
           setState(() {
-            _userName = userDoc['userName']; // Get the name from Firestore
-            _userPhone = userDoc['userPhone']; // Get the phone from Firestore
+            _userName = userDoc['name']; // Get the name from Firestore
+            _userPhone = userDoc['phone']; // Get the phone from Firestore
           });
         }
       } catch (e) {
@@ -60,7 +60,7 @@ class _UserBookingsScreenState extends State<UserBookingsScreen> {
     Query<Map<String, dynamic>> query = _firestore
         .collection('bookings')
         .where('userId', isEqualTo: _currentUser!.uid)
-        .orderBy('createdAt', descending: true); // Order by creation time
+        .orderBy('createdAt', descending: true); // Order by creation 
 
     if (_selectedFilter == 'Pending') {
       query = query.where('status', isEqualTo: 'Pending');
@@ -363,11 +363,12 @@ class _UserBookingsScreenState extends State<UserBookingsScreen> {
                   itemBuilder: (context, index) {
                     final booking = sortedBookings[index].data();
                     final Timestamp bookingTimestamp =
-                        booking['bookingDate'] as Timestamp;
+                        booking['selectedDate'] as Timestamp;
                     final DateTime bookingDateTime = bookingTimestamp.toDate();
                     final String formattedDate = DateFormat(
                       'MMM d, yyyy',
                     ).format(bookingDateTime);
+                    
 
                     final String agentId = booking['agentId'] ?? '';
                     final String serviceProviderName =
@@ -403,8 +404,8 @@ class _UserBookingsScreenState extends State<UserBookingsScreen> {
                             ),
                             _buildDetailRow(
                               Icons.access_time_rounded,
-                              'Time',
-                              booking['bookingTime'] ?? 'N/A',
+                              'Slot',
+                              booking['selectedTimeSlot'] ?? 'N/A',
                             ),
                             _buildDetailRow(
                               Icons.payments_rounded,

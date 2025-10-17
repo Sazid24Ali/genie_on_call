@@ -14,6 +14,7 @@ import 'package:geolocator/geolocator.dart';
 import 'dart:io';
 import 'package:genie_on_call/utils/coords.dart';
 import 'package:genie_on_call/screens/user/slot_selection_screen.dart';
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
 
 class BookingSlotScreen extends StatefulWidget {
   final String serviceName;
@@ -350,6 +351,7 @@ class _BookingSlotScreenState extends State<BookingSlotScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      floatingActionButton: const FloatingChatButton(),
       appBar: AppBar(
         title: Text(
           'Additional Details',

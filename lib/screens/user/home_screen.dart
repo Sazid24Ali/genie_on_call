@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:genie_on_call/providers/locale_provider.dart';
 import 'package:genie_on_call/utils/locale_utils.dart';
 import 'package:genie_on_call/screens/chat_screen.dart'; // Import ChatScreen
+import 'package:genie_on_call/screens/chats_list_screen.dart'; // Import ChatsListScreen
 
 // Helper function to map icon strings from Firestore to IconData
 IconData getIconData(String iconName) {
@@ -235,10 +236,8 @@ class _HomeScreenState extends State<HomeScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => ChatScreen(
-                chatRoomId: chatId,
-                otherUserId: otherUserId,
-              ),
+              builder: (_) =>
+                  ChatScreen(chatRoomId: chatId, otherUserId: otherUserId),
             ),
           );
         }
@@ -299,7 +298,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      floatingActionButton: const FloatingChatButton(),
+      floatingActionButton: const FloatingChatButton(
+        heroTag: 'home_floating_chat_button',
+      ),
       appBar: AppBar(
         title: TranslatedText(
           'app_title',
@@ -539,6 +540,31 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(
+              Icons.chat_bubble_rounded,
+              color: Colors.blueAccent,
+            ),
+            title: TranslatedText(
+              'Chat',
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 16,
+                color:
+                    Theme.of(context).textTheme.bodyLarge?.color ??
+                    Colors.black87,
+              ),
+            ),
+            onTap: () {
+              Navigator.pop(context); // Close the drawer
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ChatsListScreen(),
+                ),
               );
             },
           ),

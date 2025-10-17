@@ -13,6 +13,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:genie_on_call/utils/coords.dart';
 import 'package:genie_on_call/screens/user/booking_confirmation_screen.dart';
+import 'package:genie_on_call/widgets/floating_chat_button.dart';
 
 class SlotSelectionScreen extends StatefulWidget {
   final String serviceName;
@@ -166,13 +167,27 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
               print("Error during reverse geocoding: $e");
             }
           }
+          setState(() {
+            _isDataLoaded = true;
+          });
+        } else {
+          // User exists but has no location stored, get current location
+          await _getCurrentLocation();
+          setState(() {
+            _isDataLoaded = true;
+          });
         }
+      } else {
+        // For first-time users with no stored location, get current location
+        await _getCurrentLocation();
         setState(() {
           _isDataLoaded = true;
         });
       }
     } catch (e) {
       print("Error fetching user data: $e");
+      // Even on error, try to get current location for first-time users
+      await _getCurrentLocation();
       setState(() {
         _isDataLoaded = true; // Even on error, stop loading
       });
@@ -517,9 +532,6 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
         'latitude': _selectedLocation?.latitude,
         'longitude': _selectedLocation?.longitude,
         'phoneNumber': _currentUser!.phoneNumber,
-        'description': widget.description,
-        'images': widget.images,
-        'recording': widget.recording,
         'lastUpdated': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (e) {
@@ -569,6 +581,8 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
           phoneNumber: _currentUser!.phoneNumber ?? '',
           selectedDate: _selectedDate!,
           selectedTimeSlot: _selectedTimeSlot!,
+          bookingLat: _selectedLocation?.latitude,
+          bookingLng: _selectedLocation?.longitude,
         ),
       ),
     );
@@ -578,6 +592,7 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      floatingActionButton: const FloatingChatButton(),
       appBar: AppBar(
         title: Text(
           t('book_slot', 'Book Your Slot'),

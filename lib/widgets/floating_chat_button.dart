@@ -5,7 +5,9 @@ import '../screens/chats_list_screen.dart';
 import '../services/chat_service.dart';
 
 class FloatingChatButton extends StatefulWidget {
-  const FloatingChatButton({super.key});
+  final String? heroTag;
+
+  const FloatingChatButton({super.key, this.heroTag});
 
   @override
   State<FloatingChatButton> createState() => _FloatingChatButtonState();
@@ -42,8 +44,9 @@ class _FloatingChatButtonState extends State<FloatingChatButton> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       return FloatingActionButton(
+        heroTag: widget.heroTag ?? 'floating_chat_button',
         onPressed: null,
-        backgroundColor: Colors.grey,
+        backgroundColor: Colors.blueAccent.withOpacity(0.5),
         child: const Icon(
           Icons.chat_bubble_rounded,
           color: Colors.white,
@@ -70,6 +73,7 @@ class _FloatingChatButtonState extends State<FloatingChatButton> {
         return Stack(
           children: [
             FloatingActionButton(
+              heroTag: widget.heroTag ?? 'floating_chat_button',
               onPressed: () {
                 Navigator.push(
                   context,
