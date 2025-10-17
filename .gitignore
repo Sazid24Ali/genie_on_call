@@ -47,3 +47,8 @@ TODO.md
 
 #nodemodules
 cx-genie/node_modules/
+
+# Configuration files with sensitive data
+lib/config.dart
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist

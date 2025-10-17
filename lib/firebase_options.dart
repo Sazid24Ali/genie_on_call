@@ -3,6 +3,7 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'config.dart';
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
@@ -40,49 +41,49 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAg-Jud13I-zfvRUXJvaM2fOBVN97lmwqQ',
-    appId: '1:587639520564:web:57c740881fc7ca17367961',
-    messagingSenderId: '587639520564',
-    projectId: 'genie-on-call',
-    authDomain: 'genie-on-call.firebaseapp.com',
-    storageBucket: 'genie-on-call.firebasestorage.app',
-    measurementId: 'G-KH3Y5TDY3M',
+  static FirebaseOptions get web => FirebaseOptions(
+    apiKey: Config.firebaseWebApiKey,
+    appId: Config.firebaseWebAppId,
+    messagingSenderId: Config.firebaseWebMessagingSenderId,
+    projectId: Config.firebaseWebProjectId,
+    authDomain: Config.firebaseWebAuthDomain,
+    storageBucket: Config.firebaseWebStorageBucket,
+    measurementId: Config.firebaseWebMeasurementId,
   );
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyArT2kayftUu0VIRNuUmslkep11cNPn3K8',
-    appId: '1:341283748050:android:d9c6e4f71e11411047d50b',
-    messagingSenderId: '341283748050',
-    projectId: 'genie-on-call-769a1',
-    storageBucket: 'genie-on-call-769a1.firebasestorage.app',
+  static FirebaseOptions get android => FirebaseOptions(
+    apiKey: Config.firebaseAndroidApiKey,
+    appId: Config.firebaseAndroidAppId,
+    messagingSenderId: Config.firebaseAndroidMessagingSenderId,
+    projectId: Config.firebaseAndroidProjectId,
+    storageBucket: Config.firebaseAndroidStorageBucket,
   );
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDs_4doLoR2SsbATUpIo8yUoTdYBWsO_kw',
-    appId: '1:587639520564:ios:22fa95ee5389faa0367961',
-    messagingSenderId: '587639520564',
-    projectId: 'genie-on-call',
-    storageBucket: 'genie-on-call.firebasestorage.app',
-    iosBundleId: 'com.example.genieOnCall',
+  static FirebaseOptions get ios => FirebaseOptions(
+    apiKey: Config.firebaseIosApiKey,
+    appId: Config.firebaseIosAppId,
+    messagingSenderId: Config.firebaseIosMessagingSenderId,
+    projectId: Config.firebaseIosProjectId,
+    storageBucket: Config.firebaseIosStorageBucket,
+    iosBundleId: Config.iosBundleId,
   );
 
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyDs_4doLoR2SsbATUpIo8yUoTdYBWsO_kw',
-    appId: '1:587639520564:ios:22fa95ee5389faa0367961',
-    messagingSenderId: '587639520564',
-    projectId: 'genie-on-call',
-    storageBucket: 'genie-on-call.firebasestorage.app',
-    iosBundleId: 'com.example.genieOnCall',
+  static FirebaseOptions get macos => FirebaseOptions(
+    apiKey: Config.firebaseMacosApiKey,
+    appId: Config.firebaseMacosAppId,
+    messagingSenderId: Config.firebaseMacosMessagingSenderId,
+    projectId: Config.firebaseMacosProjectId,
+    storageBucket: Config.firebaseMacosStorageBucket,
+    iosBundleId: Config.iosBundleId,
   );
 
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyAg-Jud13I-zfvRUXJvaM2fOBVN97lmwqQ',
-    appId: '1:587639520564:web:a53550f0eddbdd31367961',
-    messagingSenderId: '587639520564',
-    projectId: 'genie-on-call',
-    authDomain: 'genie-on-call.firebaseapp.com',
-    storageBucket: 'genie-on-call.firebasestorage.app',
-    measurementId: 'G-02973MW57V',
+  static FirebaseOptions get windows => FirebaseOptions(
+    apiKey: Config.firebaseWindowsApiKey,
+    appId: Config.firebaseWindowsAppId,
+    messagingSenderId: Config.firebaseWindowsMessagingSenderId,
+    projectId: Config.firebaseWindowsProjectId,
+    authDomain: Config.firebaseWebAuthDomain,
+    storageBucket: Config.firebaseWindowsStorageBucket,
+    measurementId: Config.firebaseWindowsMeasurementId,
   );
 }
